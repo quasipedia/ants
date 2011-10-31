@@ -2,3 +2,4 @@ tools/*
 game_logs/*
 *.sh
 *.pyc
+bot.zip
