@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 from ants import *
+from random import shuffle
 
-# define a class with a do_turn method the Ants.run method will parse
-# and update bot input it will also run the do_turn method for us
+
 class MyBot:
 
     '''
@@ -14,10 +14,7 @@ class MyBot:
         pass
 
     # do_setup is run once at the start of the game
-    # after the bot has received the game settings
-    # the ants class is created and setup by the Ants.run method
     def do_setup(self, ants):
-        # initialize data structures after learning the game settings
         self.hills = []
         self.unseen = []
         for row in range(ants.rows):
@@ -28,7 +25,7 @@ class MyBot:
     # is updated by the Ants.run method it also has several helper
     # methods to use
     def do_turn(self, ants):
-        
+
         def do_move_direction(loc, direction):
             '''
             Order an ant to move towards a given direction. Return False
@@ -54,13 +51,17 @@ class MyBot:
                     return True
             return False
         
-        orders = {}  # track all moves, prevent collisions
-        targets = {}  # track food gathering, prevent more ants to go
+        # track all moves, prevent collisions,
+        # key=destination value=origin
+        orders = {}
+        # track food gathering, prevent more ants to go,
+        # key=destination value=origin
+        targets = {}  
 
         # prevent stepping on own hill
         for hill_loc in ants.my_hills():
             orders[hill_loc] = None
-            
+
         # find close food
         ant_dist = []
         for food_loc in ants.food():
@@ -90,7 +91,12 @@ class MyBot:
         for loc in self.unseen[:]:
             if ants.visible(loc):
                 self.unseen.remove(loc)
+            # could be a bottleneck so...
+            if ants.time_remaining() < 200:
+                break
         for ant_loc in ants.my_ants():
+            if ants.time_remaining() < 30:
+                break
             if ant_loc not in orders.values():
                 unseen_dist = []
                 for unseen_loc in self.unseen:
@@ -104,14 +110,13 @@ class MyBot:
         # unblock own hill
         for hill_loc in ants.my_hills():
             if hill_loc in ants.my_ants() and hill_loc not in orders.values():
-                for direction in ('s','e','w','n'):
+                directions = ['s','e','w','n'][:]
+                shuffle(directions)
+                for direction in directions:
                     if do_move_direction(hill_loc, direction):
                         break
-                                    
-## check if we still have time left to calculate more orders
-#if ants.time_remaining() < 10:
-    #break
 
+                                    
 if __name__ == '__main__':
     # psyco will speed up python a little, but is not needed
     try:
