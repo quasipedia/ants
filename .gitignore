@@ -1,0 +1,4 @@
+tools/*
+game_logs/*
+*.sh
+*.pyc
