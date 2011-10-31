@@ -10,10 +10,8 @@ class MyBot:
     '''
     
     def __init__(self):
-        # define class level variables, will be remembered between turns
         pass
 
-    # do_setup is run once at the start of the game
     def do_setup(self, ants):
         self.hills = []
         self.unseen = []
@@ -21,9 +19,6 @@ class MyBot:
             for col in range(ants.cols):
                 self.unseen.append((row, col))
             
-    # do turn is run once per turn the ants class has the game state and
-    # is updated by the Ants.run method it also has several helper
-    # methods to use
     def do_turn(self, ants):
 
         def do_move_direction(loc, direction):

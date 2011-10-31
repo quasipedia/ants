@@ -1,6 +1,5 @@
 tools/*
 game_logs/*
 old_bots/*
-*.sh
 *.pyc
 bot.zip
