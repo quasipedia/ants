@@ -1,10 +1,28 @@
 #!/usr/bin/env python3
+
+'''
+Contest entry for the Fall 2011 challenge on http://aichallenge.org
+
+This file parses the game engine output and contains a game state class.
+It is based off the starter package available online.
+'''
+
 import sys
 import traceback
 import random
 import time
 from collections import defaultdict
-from math import sqrt
+
+
+__author__ = "Mac Ryan"
+__copyright__ = "Copyright 2011, Mac Ryan"
+__license__ = "GPL v3"
+#__version__ = "<dev>"
+#__date__ = "<unknown>"
+__maintainer__ = "Mac Ryan"
+__email__ = "quasipedia@gmail.com"
+__status__ = "Development"
+
 
 MY_ANT = 0
 ANTS = 0
@@ -37,6 +55,14 @@ BEHIND = {'n': 's',
           'w': 'e'}
 
 class Ants():
+
+    '''
+    This class act as a middle layer between the bot AI and the game engine.
+
+    It contains the state of the game (including a representation of the world)
+    and some helper functions to be used by the bot directly.
+    '''
+
     def __init__(self):
         self.cols = None
         self.rows = None
@@ -55,9 +81,11 @@ class Ants():
         self.turns = 0
 
     def setup(self, data):
-        'parse initial input and setup starting game state'
+        '''
+        Parse the initial input, containing data about the map size, the
+        visibility range, and so on...
+        '''
         for line in data.split('\n'):
-            line = line.strip().lower()
             if len(line) > 0:
                 tokens = line.split()
                 key = tokens[0]
@@ -81,15 +109,18 @@ class Ants():
                     self.turns = int(tokens[1])
         self.map = [[LAND for col in range(self.cols)]
                     for row in range(self.rows)]
+        self._set_view_mask()
 
     def update(self, data):
-        'parse engine input and update the game state'
+        '''
+        Parse engine input and update the game state.
+        '''
         # start timer
         self.turn_start_time = time.clock()
-        
+
         # reset vision
         self.vision = None
-        
+
         # clear hill, ant and food data
         self.hill_list = {}
         for row, col in self.ant_list.keys():
@@ -101,7 +132,7 @@ class Ants():
         for row, col in self.food_list:
             self.map[row][col] = LAND
         self.food_list = []
-        
+
         # update map and create new ant and food lists
         for line in data.split('\n'):
             line = line.strip().lower()
@@ -130,62 +161,89 @@ class Ants():
                         elif tokens[0] == 'h':
                             owner = int(tokens[3])
                             self.hill_list[(row, col)] = owner
-                        
-    def time_remaining(self):
-        return self.turntime - int(1000 * (time.clock() - self.turn_start_time))
-    
+
     def issue_order(self, order):
-        'issue an order by writing the proper ant location and direction'
+        '''
+        Issue an order by writing the proper ant location and direction.
+        '''
         (row, col), direction = order
         sys.stdout.write('o %s %s %s\n' % (row, col, direction))
-        sys.stdout.flush()
-        
+
     def finish_turn(self):
-        'finish the turn by writing the go line'
+        '''
+        Finish the turn by writing the go line.
+        '''
         sys.stdout.write('go\n')
         sys.stdout.flush()
-    
+
+    def time_remaining(self):
+        '''
+        Milliseconds before turn end.
+        '''
+        elapsed = int(1000 * (time.clock() - self.turn_start_time))
+        return self.turntime - elapsed
+
     def my_hills(self):
+        '''
+        Return location of player's hills.
+        '''
         return [loc for loc, owner in self.hill_list.items()
                     if owner == MY_ANT]
 
     def enemy_hills(self):
+        '''
+        Return location and owner of opponents' hills.
+        '''
         return [(loc, owner) for loc, owner in self.hill_list.items()
                     if owner != MY_ANT]
-        
+
     def my_ants(self):
-        'return a list of all my ants'
+        '''
+        Return a list of all player's ants.
+        '''
         return [(row, col) for (row, col), owner in self.ant_list.items()
                     if owner == MY_ANT]
 
     def enemy_ants(self):
-        'return a list of all visible enemy ants'
+        '''
+        Return a list of (location, owner) for all visible enemy ants.
+        '''
         return [((row, col), owner)
                     for (row, col), owner in self.ant_list.items()
                     if owner != MY_ANT]
 
     def food(self):
-        'return a list of all food locations'
+        '''
+        Return a list of all food locations.
+        '''
         return self.food_list[:]
 
     def passable(self, loc):
-        'true if not water'
+        '''
+        Return True if the location is free to walk on it (=no water).
+        '''
         row, col = loc
         return self.map[row][col] > WATER
-    
+
     def unoccupied(self, loc):
-        'true if no ants are at the location'
+        '''
+        Return True if no ants are at the location.
+        '''
         row, col = loc
         return self.map[row][col] in (LAND, DEAD)
 
     def destination(self, loc, direction):
-        'calculate a new location given the direction and wrap correctly'
+        '''
+        Return target location given the direction. Wrap/warp correctly.
+        '''
         row, col = loc
         d_row, d_col = AIM[direction]
-        return ((row + d_row) % self.rows, (col + d_col) % self.cols)        
+        return ((row + d_row) % self.rows, (col + d_col) % self.cols)
 
-    def distance(self, loc1, loc2):
-        'calculate the closest distance between to locations'
+    def manhattan(self, loc1, loc2):
+        '''
+        Return the distance between two location in taxicab geometry.
+        '''
         row1, col1 = loc1
         row2, col2 = loc2
         d_col = min(abs(col1 - col2), self.cols - abs(col1 - col2))
@@ -193,7 +251,10 @@ class Ants():
         return d_row + d_col
 
     def direction(self, loc1, loc2):
-        'determine the 1 or 2 fastest (closest) directions to reach a location'
+        '''
+        Return a list (0, 1 or 2 elements) containing the direction to reach
+        loc2 from loc1 in the shortest manhattan distance.
+        '''
         row1, col1 = loc1
         row2, col2 = loc2
         height2 = self.rows//2
@@ -202,86 +263,91 @@ class Ants():
         if row1 < row2:
             if row2 - row1 >= height2:
                 d.append('n')
-            if row2 - row1 <= height2:
+            elif row2 - row1 <= height2:
                 d.append('s')
         if row2 < row1:
             if row1 - row2 >= height2:
                 d.append('s')
-            if row1 - row2 <= height2:
+            elif row1 - row2 <= height2:
                 d.append('n')
         if col1 < col2:
             if col2 - col1 >= width2:
                 d.append('w')
-            if col2 - col1 <= width2:
+            elif col2 - col1 <= width2:
                 d.append('e')
         if col2 < col1:
             if col1 - col2 >= width2:
                 d.append('e')
-            if col1 - col2 <= width2:
+            elif col1 - col2 <= width2:
                 d.append('w')
         return d
 
     def visible(self, loc):
-        ' determine which squares are visible to the given player '
-
+        '''
+        Return which squares are visible to the given player.
+        '''
         if self.vision == None:
-            if not hasattr(self, 'vision_offsets_2'):
-                # precalculate squares around an ant to set as visible
-                self.vision_offsets_2 = []
-                mx = int(sqrt(self.viewradius2))
-                for d_row in range(-mx,mx+1):
-                    for d_col in range(-mx,mx+1):
-                        d = d_row**2 + d_col**2
-                        if d <= self.viewradius2:
-                            self.vision_offsets_2.append((
-                                d_row%self.rows-self.rows,
-                                d_col%self.cols-self.cols
-                            ))
             # set all spaces as not visible
-            # loop through ants and set all squares around ant as visible
             self.vision = [[False]*self.cols for row in range(self.rows)]
+            # loop through ants and set squares around them as visible
             for ant in self.my_ants():
                 a_row, a_col = ant
                 for v_row, v_col in self.vision_offsets_2:
                     self.vision[a_row+v_row][a_col+v_col] = True
         row, col = loc
         return self.vision[row][col]
-    
+
     def render_text_map(self):
-        'return a pretty string representing the map'
+        '''
+        Return a pretty string representing the map.
+        '''
         tmp = ''
         for row in self.map:
             tmp += '# %s\n' % ''.join([MAP_RENDER[col] for col in row])
         return tmp
 
-    # static methods are not tied to a class and don't have self passed in
-    # this is a python decorator
-    @staticmethod
-    def run(bot):
-        'parse input, update game state and call the bot classes do_turn method'
-        ants = Ants()
-        map_data = ''
-        while(True):
-            try:
-                current_line = sys.stdin.readline().rstrip('\r\n') # string new line char
-                if current_line.lower() == 'ready':
-                    ants.setup(map_data)
-                    bot.do_setup(ants)
-                    ants.finish_turn()
-                    map_data = ''
-                elif current_line.lower() == 'go':
-                    ants.update(map_data)
-                    # call the do_turn method of the class passed in
-                    bot.do_turn(ants)
-                    ants.finish_turn()
-                    map_data = ''
-                else:
-                    map_data += current_line + '\n'
-            except EOFError:
-                break
-            except KeyboardInterrupt:
-                raise
-            except:
-                # don't raise error or return so that bot attempts to stay alive
-                traceback.print_exc(file=sys.stderr)
-                sys.stderr.flush()
+    def _set_view_mask(self):
+        '''
+        Precalculate a 'mask' of tiles that define the view field of an ant.
+        '''
+        self.vision_offsets_2 = []
+        mx = int(self.viewradius2**0.5)
+        for d_row in range(-mx, mx+1):
+            for d_col in range(-mx, mx+1):
+                d = d_row**2 + d_col**2
+                if d <= self.viewradius2:
+                    self.vision_offsets_2.append((
+                        d_row % self.rows - self.rows,
+                        d_col % self.cols - self.cols
+                    ))
+
+
+def run(bot):
+    '''
+    Parse input, update game state and call the bot classes do_turn method.
+    '''
+    ants = Ants()
+    map_data = ''
+    while(True):
+        try:
+            current_line = sys.stdin.readline().rstrip()
+            if current_line == 'ready':
+                ants.setup(map_data)
+                bot.do_setup(ants)
+                ants.finish_turn()
+                map_data = ''
+            elif current_line == 'go':
+                ants.update(map_data)
+                bot.do_turn(ants)
+                ants.finish_turn()
+                map_data = ''
+            else:
+                map_data += current_line + '\n'
+        except EOFError:
+            break
+        except KeyboardInterrupt:
+            raise
+        except:
+            # don't raise error or return so that bot attempts to stay alive
+            traceback.print_exc(file=sys.stderr)
+            sys.stderr.flush()

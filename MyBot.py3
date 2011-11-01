@@ -1,6 +1,24 @@
 #!/usr/bin/env python3
-from ants import *
+
+'''
+Contest entry for the Fall 2011 challenge on http://aichallenge.org
+
+This file is needed by the online game engine, and it exposes the main bot
+to the game API. It is based off the starter package available online.
+'''
+
+from ants import Ants, run
 from random import shuffle
+
+
+__author__ = "Mac Ryan"
+__copyright__ = "Copyright 2011, Mac Ryan"
+__license__ = "GPL v3"
+#__version__ = "<dev>"
+#__date__ = "<unknown>"
+__maintainer__ = "Mac Ryan"
+__email__ = "quasipedia@gmail.com"
+__status__ = "Development"
 
 
 class MyBot:
@@ -8,7 +26,7 @@ class MyBot:
     '''
     Main bot class
     '''
-    
+
     def __init__(self):
         pass
 
@@ -18,7 +36,7 @@ class MyBot:
         for row in range(ants.rows):
             for col in range(ants.cols):
                 self.unseen.append((row, col))
-            
+
     def do_turn(self, ants):
 
         def do_move_direction(loc, direction):
@@ -45,13 +63,13 @@ class MyBot:
                     targets[dest] = loc
                     return True
             return False
-        
+
         # track all moves, prevent collisions,
         # key=destination value=origin
         orders = {}
         # track food gathering, prevent more ants to go,
         # key=destination value=origin
-        targets = {}  
+        targets = {}
 
         # prevent stepping on own hill
         for hill_loc in ants.my_hills():
@@ -61,7 +79,7 @@ class MyBot:
         ant_dist = []
         for food_loc in ants.food():
             for ant_loc in ants.my_ants():
-                dist = ants.distance(ant_loc, food_loc)
+                dist = ants.manhattan(ant_loc, food_loc)
                 ant_dist.append((dist, ant_loc, food_loc))
         ant_dist.sort()
         for dist, ant_loc, food_loc in ant_dist:
@@ -71,12 +89,12 @@ class MyBot:
         # attack hills
         for hill_loc, hill_owner in ants.enemy_hills():
             if hill_loc not in self.hills:
-                self.hills.append(hill_loc)        
+                self.hills.append(hill_loc)
         ant_dist = []
         for hill_loc in self.hills:
             for ant_loc in ants.my_ants():
                 if ant_loc not in orders.values():
-                    dist = ants.distance(ant_loc, hill_loc)
+                    dist = ants.manhattan(ant_loc, hill_loc)
                     ant_dist.append((dist, ant_loc))
         ant_dist.sort()
         for dist, ant_loc in ant_dist:
@@ -95,7 +113,7 @@ class MyBot:
             if ant_loc not in orders.values():
                 unseen_dist = []
                 for unseen_loc in self.unseen:
-                    dist = ants.distance(ant_loc, unseen_loc)
+                    dist = ants.manhattan(ant_loc, unseen_loc)
                     unseen_dist.append((dist, unseen_loc))
                 unseen_dist.sort()
                 for dist, unseen_loc in unseen_dist:
@@ -111,19 +129,14 @@ class MyBot:
                     if do_move_direction(hill_loc, direction):
                         break
 
-                                    
 if __name__ == '__main__':
-    # psyco will speed up python a little, but is not needed
+    # Psycho speedup (available on 32 bit only)
     try:
         import psyco
         psyco.full()
     except ImportError:
         pass
-
     try:
-        # if run is passed a class with a do_turn method, it will do the work
-        # this is not needed, in which case you will need to write your own
-        # parsing function and your own game state class
-        Ants.run(MyBot())
+        run(MyBot())
     except KeyboardInterrupt:
         print('ctrl-c, leaving ...')

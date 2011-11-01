@@ -10,7 +10,7 @@ python tools/playgame.py "python3 MyBot.py3" \
                          "python3 ${OPPONENT}" \
                          --map_file tools/maps/random_walk/random_walk_03p_01.map \
                          --log_dir game_logs \
-                         --turns 300 \
+                         --turns 60 \
                          --verbose \
                          --log_stderr \
                          --turntime=5000 \

@@ -3,4 +3,6 @@ tools/*
 game_logs/*
 old_bots/*
 *.pyc
+*.py3c
 bot.zip
+ants.geany
