@@ -1,4 +1,5 @@
+*.rst export-ignore
+*.sh export-ignore
+stats.py export-ignore
 .gitignore export-ignore
 .gitattributes export-ignore
-README.rst export-ignore
-*.sh export-ignore

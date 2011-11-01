@@ -7,6 +7,7 @@ This file is needed by the online game engine, and it exposes the main bot
 to the game API. It is based off the starter package available online.
 '''
 
+import platform
 from ants import Ants, run
 from random import shuffle
 
@@ -37,7 +38,15 @@ class MyBot:
             for col in range(ants.cols):
                 self.unseen.append((row, col))
 
-    def do_turn(self, ants):
+    def _do_turn(self, ants):
+
+        '''
+        This is the raw function invoked by the game engine at each turn.
+
+        The game engine will actually invoke ``do_turn()`` rather than
+        ``_do_turn()``, but the ``main()`` might wrap the turn into a profiler
+        when played locally, hence this intermediate step.
+        '''
 
         def do_move_direction(loc, direction):
             '''
@@ -129,14 +138,32 @@ class MyBot:
                     if do_move_direction(hill_loc, direction):
                         break
 
+
 if __name__ == '__main__':
+
     # Psycho speedup (available on 32 bit only)
     try:
         import psyco
         psyco.full()
     except ImportError:
         pass
+    bot = MyBot()
+
+    # Establish if the bot is running locally, in which case we want to have
+    # profiling and logging enabled.
+    hostname = platform.uname()[1]
+    if hostname in ('jabbar', 'hopper'):
+        import cProfile
+        profiler = cProfile.Profile()
+        def profiled_turn(*args, **kwargs):
+            profiler.runcall(bot._do_turn, *args, **kwargs)
+            profiler.dump_stats('last_run.profile')
+        bot.do_turn = profiled_turn
+    else:
+        bot.do_turn = bot._do_turn
+
+    # Activate the bot and start playing
     try:
-        run(MyBot())
+        run(bot)
     except KeyboardInterrupt:
         print('ctrl-c, leaving ...')
