@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 
 '''
 Contest entry for the Fall 2011 challenge on http://aichallenge.org
@@ -153,7 +153,6 @@ if __name__ == '__main__':
     # profiling and logging enabled.
     hostname = platform.uname()[1]
     if hostname in ('jabbar', 'hopper'):
-        # Times individual turns
         from time import time
         timings = open('turns_lengths.profile', 'w')
         import cProfile

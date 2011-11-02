@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 
 '''
 Contest entry for the Fall 2011 challenge on http://aichallenge.org
@@ -11,6 +11,7 @@ import sys
 import traceback
 import random
 import time
+import numpy as np
 from collections import defaultdict
 
 
@@ -244,6 +245,9 @@ class Ants():
         '''
         Return the distance between two location in taxicab geometry.
         '''
+        #loc1 = np.array(loc1)
+        #loc2 = np.array(loc2)
+        #return sum(abs(loc2-loc1))
         row1, col1 = loc1
         row2, col2 = loc2
         d_col = min(abs(col1 - col2), self.cols - abs(col1 - col2))

@@ -7,7 +7,7 @@ tools/playgame.py --engine_seed 42 \
 				  --log_dir game_logs \
 				  --turns 30 \
 				  --map_file tools/submission_test/test.map \
-				  "./MyBot.py3" \
+				  "./MyBot.py" \
 				  "python tools/submission_test/TestBot.py" \
 				  --nolaunch \
 				  --log_stderr \

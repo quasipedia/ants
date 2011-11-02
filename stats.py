@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 # Simple script to visualise the information about profiling the bot.
 
 # TURN LENGTH
