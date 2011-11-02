@@ -153,10 +153,16 @@ if __name__ == '__main__':
     # profiling and logging enabled.
     hostname = platform.uname()[1]
     if hostname in ('jabbar', 'hopper'):
+        # Times individual turns
+        from time import time
+        timings = open('turns_lengths.profile', 'w')
         import cProfile
         profiler = cProfile.Profile()
         def profiled_turn(*args, **kwargs):
+            start = time()
             profiler.runcall(bot._do_turn, *args, **kwargs)
+            timings.write('%.3f ' % (time() - start))
+            timings.flush()
             profiler.dump_stats('last_run.profile')
         bot.do_turn = profiled_turn
     else:
