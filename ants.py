@@ -11,8 +11,7 @@ import sys
 import traceback
 import random
 import time
-import numpy as np
-from collections import defaultdict
+from numpy import array, zeros, int8, minimum
 
 
 __author__ = "Mac Ryan"
@@ -24,36 +23,34 @@ __maintainer__ = "Mac Ryan"
 __email__ = "quasipedia@gmail.com"
 __status__ = "Development"
 
+# MAP DESCRIPTORS
+WATER = -1
+UNEXPLORED = 0
+LAND = 1
+OWN_HILL = 50  # Enemy hills are "OWN_HILL + owner"
 
-MY_ANT = 0
-ANTS = 0
-DEAD = -1
-LAND = -2
-FOOD = -3
-WATER = -4
+# VIEW DESCRIPTORS
+VISIBLE = True
+FOGGED = False
 
-PLAYER_ANT = 'abcdefghij'
-HILL_ANT = string = 'ABCDEFGHI'
-PLAYER_HILL = string = '0123456789'
-MAP_OBJECT = '?%*.!'
-MAP_RENDER = PLAYER_ANT + HILL_ANT + PLAYER_HILL + MAP_OBJECT
+# HUD DESCRIPTORS
+# The basic idea is to have the values sorted in a way that facilitate testing
+# through the minor and major (<, >) operators. As a rule of thumb, the lower
+# the number, the most attractive the target.
+FOOD = 100
+OWN_ANT = 10    # Other players' ants are 11, 12... [OWN_ANTS + owner]
+OWN_DEAD = -10  # Other players' ants are -11, -12... [OWN_ANTS - owner]
+# HILLS: constants defined for map are used
 
-AIM = {'n': (-1, 0),
-       'e': (0, 1),
-       's': (1, 0),
-       'w': (0, -1)}
-RIGHT = {'n': 'e',
-         'e': 's',
-         's': 'w',
-         'w': 'n'}
-LEFT = {'n': 'w',
-        'e': 'n',
-        's': 'e',
-        'w': 's'}
-BEHIND = {'n': 's',
-          's': 'n',
-          'e': 'w',
-          'w': 'e'}
+# This is just to prevent myself from screwing up!
+assert WATER != UNEXPLORED != LAND != OWN_HILL != VISIBLE != FOGGED != \
+       FOOD != OWN_ANT != OWN_DEAD
+assert WATER < UNEXPLORED < min(LAND, OWN_HILL)
+
+AIM = {'n': array((0, -1), int8),
+       'e': array((1, 0), int8),
+       's': array((0, 1), int8),
+       'w': array((-1, 0), int8)}
 
 class Ants():
 
@@ -62,55 +59,45 @@ class Ants():
 
     It contains the state of the game (including a representation of the world)
     and some helper functions to be used by the bot directly.
-    '''
 
-    def __init__(self):
-        self.cols = None
-        self.rows = None
-        self.map = None
-        self.hill_list = {}
-        self.ant_list = {}
-        self.dead_list = defaultdict(list)
-        self.food_list = []
-        self.turntime = 0
-        self.loadtime = 0
-        self.turn_start_time = None
-        self.vision = None
-        self.viewradius2 = 0
-        self.attackradius2 = 0
-        self.spawnradius2 = 0
-        self.turns = 0
+      - map  : a representation of the terrain features
+      - view : a representation of the viewable area of the map
+      - hud  : [head-up display] a representation of tactical targets
+    '''
 
     def setup(self, data):
         '''
         Parse the initial input, containing data about the map size, the
-        visibility range, and so on...
+        visibility range, and so on... Known keys passed in the intial input:
+          - loadtime       # in milliseconds, time given for bot to start up
+          - turntime       # in milliseconds, time given to the bot each turn
+          - rows           # number of rows in the map
+          - cols           # number of columns in the map
+          - turns          # maximum number of turns in the game
+          - viewradius2    # view radius squared
+          - attackradius2  # battle radius squared
+          - spawnradius2   # food gathering radius squared (unfortunate name)
+          - player_seed    # seed for random number generator
         '''
-        for line in data.split('\n'):
-            if len(line) > 0:
-                tokens = line.split()
-                key = tokens[0]
-                if key == 'cols':
-                    self.cols = int(tokens[1])
-                elif key == 'rows':
-                    self.rows = int(tokens[1])
-                elif key == 'player_seed':
-                    random.seed(int(tokens[1]))
-                elif key == 'turntime':
-                    self.turntime = int(tokens[1])
-                elif key == 'loadtime':
-                    self.loadtime = int(tokens[1])
-                elif key == 'viewradius2':
-                    self.viewradius2 = int(tokens[1])
-                elif key == 'attackradius2':
-                    self.attackradius2 = int(tokens[1])
-                elif key == 'spawnradius2':
-                    self.spawnradius2 = int(tokens[1])
-                elif key == 'turns':
-                    self.turns = int(tokens[1])
-        self.map = [[LAND for col in range(self.cols)]
-                    for row in range(self.rows)]
-        self._set_view_mask()
+        # Store received data
+        data = [line.split() for line in data]
+        for k, v in data:
+            setattr(self, k, int(v))
+        self.map_size = array((self.cols, self.rows))
+        # Generate map and hud
+        self.map = zeros(self.map_size, dtype=int8)
+        self.view = zeros(self.map_size, dtype=bool)
+        self.hud = zeros(self.map_size, dtype=int8)
+        # Generate the field-of-view mask
+        mx = int(self.viewradius2**0.5)
+        side = mx * 2 + 1
+        self.view_mask = zeros((side, side), dtype=bool)
+        for d_row in range(-mx, mx+1):
+            for d_col in range(-mx, mx+1):
+                d = d_row**2 + d_col**2
+                if d <= self.viewradius2:
+                    self.view_mask[mx+d_col][mx+d_row] = VISIBLE
+        self.viewradiusint = mx
 
     def update(self, data):
         '''
@@ -119,49 +106,50 @@ class Ants():
         # start timer
         self.turn_start_time = time.clock()
 
-        # reset vision
-        self.vision = None
-
-        # clear hill, ant and food data
-        self.hill_list = {}
-        for row, col in self.ant_list.keys():
-            self.map[row][col] = LAND
-        self.ant_list = {}
-        for row, col in self.dead_list.keys():
-            self.map[row][col] = LAND
-        self.dead_list = defaultdict(list)
-        for row, col in self.food_list:
-            self.map[row][col] = LAND
-        self.food_list = []
+        # reset turn variables
+        self.hud *= FOGGED
+        self.food = []
+        self.own_ants = []
+        self.own_hills = []
+        self.own_deads = []
+        self.enemy_ants = []
+        self.enemy_hills = []
+        self.enemy_deads = []
 
         # update map and create new ant and food lists
-        for line in data.split('\n'):
-            line = line.strip().lower()
-            if len(line) > 0:
-                tokens = line.split()
-                if len(tokens) >= 3:
-                    row = int(tokens[1])
-                    col = int(tokens[2])
-                    if tokens[0] == 'w':
-                        self.map[row][col] = WATER
-                    elif tokens[0] == 'f':
-                        self.map[row][col] = FOOD
-                        self.food_list.append((row, col))
-                    else:
-                        owner = int(tokens[3])
-                        if tokens[0] == 'a':
-                            self.map[row][col] = owner
-                            self.ant_list[(row, col)] = owner
-                        elif tokens[0] == 'd':
-                            # food could spawn on a spot where an ant just died
-                            # don't overwrite the space unless it is land
-                            if self.map[row][col] == LAND:
-                                self.map[row][col] = DEAD
-                            # but always add to the dead list
-                            self.dead_list[(row, col)].append(owner)
-                        elif tokens[0] == 'h':
-                            owner = int(tokens[3])
-                            self.hill_list[(row, col)] = owner
+        for line in data:
+            tokens = line.split()
+            if len(tokens) >= 3:
+                row = int(tokens[1])
+                col = int(tokens[2])
+                if tokens[0] == 'w':
+                    self.map[col][row] = WATER
+                elif tokens[0] == 'f':
+                    self.hud[col][row] = FOOD
+                    self.food.append((col, row))
+                else:
+                    owner = int(tokens[3])
+                    if tokens[0] == 'a':
+                        self.hud[col][row] = OWN_ANT + owner
+                        if not owner:  # owner == 0 --> player's ant
+                            self.own_ants.append(array((col, row)))
+                            #TODO: viewmask here
+                        else:
+                            self.enemy_ants.append(array((col, row)))
+                    elif tokens[0] == 'd':
+                        # food could spawn on a spot where an ant just died
+                        # don't overwrite the space on the hud.
+                        self.hud[col][row] = self.hud[col][row] or DEAD
+                        # but always add to the dead list
+                        if not owner:  # owner == 0 --> player's ant
+                            self.own_deads.append(array((col, row)))
+                        else:
+                            self.enemy_deads.append((array(col, row)))
+                    elif tokens[0] == 'h':
+                        if not owner:  # owner == 0 --> player's hill
+                            self.own_hills.append(array((col, row)))
+                        else:
+                            self.enemy_hills.append(array((col, row)))
 
     def issue_order(self, order):
         '''
@@ -184,75 +172,21 @@ class Ants():
         elapsed = int(1000 * (time.clock() - self.turn_start_time))
         return self.turntime - elapsed
 
-    def my_hills(self):
-        '''
-        Return location of player's hills.
-        '''
-        return [loc for loc, owner in self.hill_list.items()
-                    if owner == MY_ANT]
-
-    def enemy_hills(self):
-        '''
-        Return location and owner of opponents' hills.
-        '''
-        return [(loc, owner) for loc, owner in self.hill_list.items()
-                    if owner != MY_ANT]
-
-    def my_ants(self):
-        '''
-        Return a list of all player's ants.
-        '''
-        return [(row, col) for (row, col), owner in self.ant_list.items()
-                    if owner == MY_ANT]
-
-    def enemy_ants(self):
-        '''
-        Return a list of (location, owner) for all visible enemy ants.
-        '''
-        return [((row, col), owner)
-                    for (row, col), owner in self.ant_list.items()
-                    if owner != MY_ANT]
-
-    def food(self):
-        '''
-        Return a list of all food locations.
-        '''
-        return self.food_list[:]
-
-    def passable(self, loc):
-        '''
-        Return True if the location is free to walk on it (=no water).
-        '''
-        row, col = loc
-        return self.map[row][col] > WATER
-
-    def unoccupied(self, loc):
-        '''
-        Return True if no ants are at the location.
-        '''
-        row, col = loc
-        return self.map[row][col] in (LAND, DEAD)
-
-    def destination(self, loc, direction):
-        '''
-        Return target location given the direction. Wrap/warp correctly.
-        '''
-        row, col = loc
-        d_row, d_col = AIM[direction]
-        return ((row + d_row) % self.rows, (col + d_col) % self.cols)
-
     def manhattan(self, loc1, loc2):
         '''
         Return the distance between two location in taxicab geometry.
+        Uses the numpy arrays and wrap/warp correctly.
         '''
-        #loc1 = np.array(loc1)
-        #loc2 = np.array(loc2)
-        #return sum(abs(loc2-loc1))
-        row1, col1 = loc1
-        row2, col2 = loc2
-        d_col = min(abs(col1 - col2), self.cols - abs(col1 - col2))
-        d_row = min(abs(row1 - row2), self.rows - abs(row1 - row2))
-        return d_row + d_col
+        absolute = abs(loc1 - loc2)
+        modular = self.map_size - absolute
+        return sum(minimum(absolute, modular))
+
+    def destination(self, loc, direction):
+        '''
+        Return target location given the direction.
+        Uses the numpy arrays and wrap/warp correctly.
+        '''
+        return (loc + AIM[direction]) % self.map_size
 
     def direction(self, loc1, loc2):
         '''
@@ -286,67 +220,32 @@ class Ants():
                 d.append('w')
         return d
 
-    def visible(self, loc):
-        '''
-        Return which squares are visible to the given player.
-        '''
-        if self.vision == None:
-            # set all spaces as not visible
-            self.vision = [[False]*self.cols for row in range(self.rows)]
-            # loop through ants and set squares around them as visible
-            for ant in self.my_ants():
-                a_row, a_col = ant
-                for v_row, v_col in self.vision_offsets_2:
-                    self.vision[a_row+v_row][a_col+v_col] = True
-        row, col = loc
-        return self.vision[row][col]
-
-    def render_text_map(self):
-        '''
-        Return a pretty string representing the map.
-        '''
-        tmp = ''
-        for row in self.map:
-            tmp += '# %s\n' % ''.join([MAP_RENDER[col] for col in row])
-        return tmp
-
-    def _set_view_mask(self):
-        '''
-        Precalculate a 'mask' of tiles that define the view field of an ant.
-        '''
-        self.vision_offsets_2 = []
-        mx = int(self.viewradius2**0.5)
-        for d_row in range(-mx, mx+1):
-            for d_col in range(-mx, mx+1):
-                d = d_row**2 + d_col**2
-                if d <= self.viewradius2:
-                    self.vision_offsets_2.append((
-                        d_row % self.rows - self.rows,
-                        d_col % self.cols - self.cols
-                    ))
-
 
 def run(bot):
     '''
     Parse input, update game state and call the bot classes do_turn method.
     '''
     ants = Ants()
-    map_data = ''
+    map_data = []
     while(True):
         try:
-            current_line = sys.stdin.readline().rstrip()
+            # This is where input validation should happen (modify case,
+            # strip whitespaces, skip empty lines...)
+            current_line = sys.stdin.readline().strip().lower()
+            if not current_line:
+                continue  #skip empty lines
             if current_line == 'ready':
                 ants.setup(map_data)
                 bot.do_setup(ants)
                 ants.finish_turn()
-                map_data = ''
+                map_data = []
             elif current_line == 'go':
                 ants.update(map_data)
                 bot.do_turn(ants)
                 ants.finish_turn()
-                map_data = ''
+                map_data = []
             else:
-                map_data += current_line + '\n'
+                map_data.append(current_line)
         except EOFError:
             break
         except KeyboardInterrupt:

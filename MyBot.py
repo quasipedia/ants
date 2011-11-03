@@ -7,9 +7,8 @@ This file is needed by the online game engine, and it exposes the main bot
 to the game API. It is based off the starter package available online.
 '''
 
-import platform
 from ants import Ants, run
-from random import shuffle
+from random import shuffle, choice
 
 
 __author__ = "Mac Ryan"
@@ -32,11 +31,7 @@ class MyBot:
         pass
 
     def do_setup(self, ants):
-        self.hills = []
-        self.unseen = []
-        for row in range(ants.rows):
-            for col in range(ants.cols):
-                self.unseen.append((row, col))
+        pass
 
     def _do_turn(self, ants):
 
@@ -54,8 +49,10 @@ class MyBot:
             if the move is impossible or unsafe to perform, True
             otherwise.
             '''
-            new_loc = ants.destination(loc, direction)
-            if (ants.unoccupied(new_loc) and new_loc not in orders):
+            new_loc = tuple(ants.destination(loc, direction))
+            col, row = new_loc
+            if ants.map[new_loc] >= 0 and ants.hud[new_loc] != 10 \
+                                      and new_loc not in orders:
                 ants.issue_order((loc, direction))
                 orders[new_loc] = loc
                 return True
@@ -69,7 +66,7 @@ class MyBot:
             directions = ants.direction(loc, dest)
             for direction in directions:
                 if do_move_direction(loc, direction):
-                    targets[dest] = loc
+                    targets[tuple(dest)] = loc
                     return True
             return False
 
@@ -81,12 +78,12 @@ class MyBot:
         targets = {}
 
         # prevent stepping on own hill
-        for hill_loc in ants.my_hills():
-            orders[hill_loc] = None
+        for hill_loc in ants.own_hills:
+            orders[tuple(hill_loc)] = None
 
         # find close food
         ant_dist = []
-        for food_loc in ants.food():
+        for food_loc in ants.food:
             for ant_loc in ants.my_ants():
                 dist = ants.manhattan(ant_loc, food_loc)
                 ant_dist.append((dist, ant_loc, food_loc))
@@ -96,12 +93,9 @@ class MyBot:
                 do_move_location(ant_loc, food_loc)
 
         # attack hills
-        for hill_loc, hill_owner in ants.enemy_hills():
-            if hill_loc not in self.hills:
-                self.hills.append(hill_loc)
         ant_dist = []
-        for hill_loc in self.hills:
-            for ant_loc in ants.my_ants():
+        for hill_loc in ants.enemy_hills:
+            for ant_loc in ants.own_ants:
                 if ant_loc not in orders.values():
                     dist = ants.manhattan(ant_loc, hill_loc)
                     ant_dist.append((dist, ant_loc))
@@ -110,28 +104,33 @@ class MyBot:
             do_move_location(ant_loc, hill_loc)
 
         # explore unseen areas
-        for loc in self.unseen[:]:
-            if ants.visible(loc):
-                self.unseen.remove(loc)
-            # could be a bottleneck so...
-            if ants.time_remaining() < 200:
-                break
-        for ant_loc in ants.my_ants():
-            if ants.time_remaining() < 30:
-                break
-            if ant_loc not in orders.values():
-                unseen_dist = []
-                for unseen_loc in self.unseen:
-                    dist = ants.manhattan(ant_loc, unseen_loc)
-                    unseen_dist.append((dist, unseen_loc))
-                unseen_dist.sort()
-                for dist, unseen_loc in unseen_dist:
-                    if do_move_location(ant_loc, unseen_loc):
-                        break
+        directions = ['s','e','w','n']
+        for loc in ants.own_ants:
+            if tuple(loc) not in orders:
+                do_move_direction(loc, choice(direction))
+        #for loc in self.unseen[:]:
+            #if ants.visible(loc):
+                #self.unseen.remove(loc)
+             ##could be a bottleneck so...
+            #if ants.time_remaining() < 200:
+                #break
+        #for ant_loc in ants.my_ants():
+            #if ants.time_remaining() < 30:
+                #break
+            #if ant_loc not in orders.values():
+                #unseen_dist = []
+                #for unseen_loc in self.unseen:
+                    #dist = ants.manhattan(ant_loc, unseen_loc)
+                    #unseen_dist.append((dist, unseen_loc))
+                #unseen_dist.sort()
+                #for dist, unseen_loc in unseen_dist:
+                    #if do_move_location(ant_loc, unseen_loc):
+                        #break
 
         # unblock own hill
-        for hill_loc in ants.my_hills():
-            if hill_loc in ants.my_ants() and hill_loc not in orders.values():
+        for hill_loc in ants.own_hills:
+            if hill_loc in ants.own_ants :#\
+                             #and not (tuple(hill_loc) in orders.values()):
                 directions = ['s','e','w','n'][:]
                 shuffle(directions)
                 for direction in directions:
@@ -150,9 +149,11 @@ if __name__ == '__main__':
     bot = MyBot()
 
     # Establish if the bot is running locally, in which case we want to have
-    # profiling and logging enabled.
-    hostname = platform.uname()[1]
-    if hostname in ('jabbar', 'hopper'):
+    # profiling and logging enabled. Profiling is done if the file named
+    # ``do_profile`` is present in the directoy where the code is ran.
+    try:
+        f = open('do_profile')
+        f.close()
         from time import time
         timings = open('turns_lengths.profile', 'w')
         import cProfile
@@ -164,11 +165,11 @@ if __name__ == '__main__':
             timings.flush()
             profiler.dump_stats('last_run.profile')
         bot.do_turn = profiled_turn
-    else:
+    except IOError:
         bot.do_turn = bot._do_turn
 
     # Activate the bot and start playing
     try:
         run(bot)
     except KeyboardInterrupt:
-        print('ctrl-c, leaving ...')
+        print('ctrl-C, leaving ...')

@@ -1,5 +1,7 @@
 *.rst export-ignore
 *.sh export-ignore
-stats.py export-ignore
 .gitignore export-ignore
 .gitattributes export-ignore
+stats.py export-ignore
+tests.py export-ignore
+do_profile export-ignore

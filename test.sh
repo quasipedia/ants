@@ -1,4 +1,5 @@
 #! /bin/bash
+rm *.pyc
 tools/playgame.py --engine_seed 42 \
 				  --player_seed 42 \
 				  --food none \

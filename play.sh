@@ -1,4 +1,5 @@
 #! /bin/bash
+rm *.pyc
 set -e
 if [ ! $1 ]
 	then
@@ -10,7 +11,7 @@ python tools/playgame.py "python MyBot.py" \
                          "python ${OPPONENT}" \
                          --map_file tools/maps/random_walk/random_walk_03p_01.map \
                          --log_dir game_logs \
-                         --turns 60 \
+                         --turns 20 \
                          --verbose \
                          --log_stderr \
                          --turntime=5000 \
