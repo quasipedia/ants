@@ -129,8 +129,8 @@ class MyBot:
 
         # unblock own hill
         for hill_loc in ants.own_hills:
-            if hill_loc in ants.own_ants :#\
-                             #and not (tuple(hill_loc) in orders.values()):
+            if hill_loc in ants.own_ants \
+                             and not (tuple(hill_loc) in orders.values()):
                 directions = ['s','e','w','n'][:]
                 shuffle(directions)
                 for direction in directions:
@@ -154,8 +154,10 @@ if __name__ == '__main__':
     try:
         f = open('do_profile')
         f.close()
+        # Timing turns
         from time import time
         timings = open('turns_lengths.profile', 'w')
+        # Profiling the code
         import cProfile
         profiler = cProfile.Profile()
         def profiled_turn(*args, **kwargs):

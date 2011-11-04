@@ -12,6 +12,7 @@ import traceback
 import random
 import time
 from numpy import array, zeros, int8, minimum
+from numpy import abs as np_abs
 
 
 __author__ = "Mac Ryan"
@@ -23,36 +24,25 @@ __maintainer__ = "Mac Ryan"
 __email__ = "quasipedia@gmail.com"
 __status__ = "Development"
 
-# MAP DESCRIPTORS
+# MAP ENTITY DESCRIPTORS
+OWN_HILL = -10  # Other players' ants are -11, -12... [OWN_HILL - owner]
 WATER = -1
-UNEXPLORED = 0
-LAND = 1
-OWN_HILL = 50  # Enemy hills are "OWN_HILL + owner"
+LAND = 0
+FOOD = 1
+OWN_ANT = 10    # Other players' ants are 11, 12... [OWN_ANT + owner]
+OWN_DEAD = 100  # Other players' ants are 101, 102... [OWN_DEAD + owner]
 
-# VIEW DESCRIPTORS
+# VIEW_MASK
 VISIBLE = True
 FOGGED = False
-
-# HUD DESCRIPTORS
-# The basic idea is to have the values sorted in a way that facilitate testing
-# through the minor and major (<, >) operators. As a rule of thumb, the lower
-# the number, the most attractive the target.
-FOOD = 100
-OWN_ANT = 10    # Other players' ants are 11, 12... [OWN_ANTS + owner]
-OWN_DEAD = -10  # Other players' ants are -11, -12... [OWN_ANTS - owner]
-# HILLS: constants defined for map are used
-
-# This is just to prevent myself from screwing up!
-assert WATER != UNEXPLORED != LAND != OWN_HILL != VISIBLE != FOGGED != \
-       FOOD != OWN_ANT != OWN_DEAD
-assert WATER < UNEXPLORED < min(LAND, OWN_HILL)
 
 AIM = {'n': array((0, -1), int8),
        'e': array((1, 0), int8),
        's': array((0, 1), int8),
        'w': array((-1, 0), int8)}
 
-class Ants():
+
+class World():
 
     '''
     This class act as a middle layer between the bot AI and the game engine.
@@ -85,9 +75,7 @@ class Ants():
             setattr(self, k, int(v))
         self.map_size = array((self.cols, self.rows))
         # Generate map and hud
-        self.map = zeros(self.map_size, dtype=int8)
-        self.view = zeros(self.map_size, dtype=bool)
-        self.hud = zeros(self.map_size, dtype=int8)
+        self.map = zeros((self.cols, self.rows, 3), dtype=float)
         # Generate the field-of-view mask
         mx = int(self.viewradius2**0.5)
         side = mx * 2 + 1
@@ -101,13 +89,14 @@ class Ants():
 
     def update(self, data):
         '''
-        Parse engine input and update the game state.
+        Parse engine input, updating the map.
         '''
         # start timer
-        self.turn_start_time = time.clock()
+        self.turn_start_time = time.time()
+
+        # eliminate all temporay objects, keep water + hills.
 
         # reset turn variables
-        self.hud *= FOGGED
         self.food = []
         self.own_ants = []
         self.own_hills = []
@@ -116,7 +105,7 @@ class Ants():
         self.enemy_hills = []
         self.enemy_deads = []
 
-        # update map and create new ant and food lists
+        # parse input lines
         for line in data:
             tokens = line.split()
             if len(tokens) >= 3:
@@ -132,10 +121,10 @@ class Ants():
                     if tokens[0] == 'a':
                         self.hud[col][row] = OWN_ANT + owner
                         if not owner:  # owner == 0 --> player's ant
-                            self.own_ants.append(array((col, row)))
+                            self.own_world.append(array((col, row)))
                             #TODO: viewmask here
                         else:
-                            self.enemy_ants.append(array((col, row)))
+                            self.enemy_world.append(array((col, row)))
                     elif tokens[0] == 'd':
                         # food could spawn on a spot where an ant just died
                         # don't overwrite the space on the hud.
@@ -151,11 +140,25 @@ class Ants():
                         else:
                             self.enemy_hills.append(array((col, row)))
 
+
+        # eliminate hills whose destruction has been positively confirmed
+
+        # use view_mask to reset the last_seen counter of visible land
+
+    def diffuse(self, steps=None):
+        '''
+        Diffuse scents over the map. Iterate ``step`` times. Default to the
+        square of the view radius.
+        '''
+        if steps == None:
+            steps = world.viewradius2
+
     def issue_order(self, order):
         '''
         Issue an order by writing the proper ant location and direction.
         '''
-        (row, col), direction = order
+        (col, row), direction = order
+        # note that game API wants row before col!
         sys.stdout.write('o %s %s %s\n' % (row, col, direction))
 
     def finish_turn(self):
@@ -169,7 +172,7 @@ class Ants():
         '''
         Milliseconds before turn end.
         '''
-        elapsed = int(1000 * (time.clock() - self.turn_start_time))
+        elapsed = int(1000 * (time.time() - self.turn_start_time))
         return self.turntime - elapsed
 
     def manhattan(self, loc1, loc2):
@@ -177,9 +180,9 @@ class Ants():
         Return the distance between two location in taxicab geometry.
         Uses the numpy arrays and wrap/warp correctly.
         '''
-        absolute = abs(loc1 - loc2)
+        absolute = np_abs(loc1 - loc2)  # slightly faster than abs()
         modular = self.map_size - absolute
-        return sum(minimum(absolute, modular))
+        return sum(minimum(absolute, modular))  # slightly faster than a.sum()
 
     def destination(self, loc, direction):
         '''
@@ -187,38 +190,6 @@ class Ants():
         Uses the numpy arrays and wrap/warp correctly.
         '''
         return (loc + AIM[direction]) % self.map_size
-
-    def direction(self, loc1, loc2):
-        '''
-        Return a list (0, 1 or 2 elements) containing the direction to reach
-        loc2 from loc1 in the shortest manhattan distance.
-        '''
-        row1, col1 = loc1
-        row2, col2 = loc2
-        height2 = self.rows//2
-        width2 = self.cols//2
-        d = []
-        if row1 < row2:
-            if row2 - row1 >= height2:
-                d.append('n')
-            elif row2 - row1 <= height2:
-                d.append('s')
-        if row2 < row1:
-            if row1 - row2 >= height2:
-                d.append('s')
-            elif row1 - row2 <= height2:
-                d.append('n')
-        if col1 < col2:
-            if col2 - col1 >= width2:
-                d.append('w')
-            elif col2 - col1 <= width2:
-                d.append('e')
-        if col2 < col1:
-            if col1 - col2 >= width2:
-                d.append('e')
-            elif col1 - col2 <= width2:
-                d.append('w')
-        return d
 
 
 def run(bot):
@@ -235,14 +206,15 @@ def run(bot):
             if not current_line:
                 continue  #skip empty lines
             if current_line == 'ready':
-                ants.setup(map_data)
+                world.setup(map_data)
                 bot.do_setup(ants)
-                ants.finish_turn()
+                world.finish_turn()
                 map_data = []
             elif current_line == 'go':
-                ants.update(map_data)
+                world.update(map_data)
+                world.diffuse()
                 bot.do_turn(ants)
-                ants.finish_turn()
+                world.finish_turn()
                 map_data = []
             else:
                 map_data.append(current_line)
