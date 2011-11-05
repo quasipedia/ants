@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+# -*- coding: utf-8  -*-
 
 '''
 Contest entry for the Fall 2011 challenge on http://aichallenge.org

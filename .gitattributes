@@ -5,3 +5,4 @@
 stats.py export-ignore
 tests.py export-ignore
 do_profile export-ignore
+visualisation.py export-ignore

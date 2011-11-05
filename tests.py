@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+# -*- coding: utf-8  -*-
 
 '''
 Contest entry for the Fall 2011 challenge on http://aichallenge.org
@@ -50,28 +51,27 @@ class TestAnts(unittest.TestCase):
         self.fake_stdout.truncate(0)
         return data
 
-    def _perform_world_setup(self):
+    def _perform_world_setup(self, text=None):
         '''
         Helper function that perform a standard setup of the world.
         '''
-        text = '''turn 0
-                  loadtime 3000
-                  turntime 1000
-                  rows 20
-                  cols 30
-                  turns 500
-                  viewradius2 10
-                  attackradius2 5
-                  spawnradius2 1
-                  player_seed 42
-               '''
+        if text == None:
+            text = '''loadtime 3000
+                      turntime 1000
+                      rows 20
+                      cols 30
+                      turns 500
+                      viewradius2 10
+                      attackradius2 5
+                      spawnradius2 1
+                      player_seed 42
+                   '''
         data = [line.strip() for line in text.split('\n') if line.strip()]
         self.world.setup(data)
 
     def test_setup(self):
         self._perform_world_setup()
         # check data has been loaded correctly
-        self.assertEqual(self.world.turn, 0)
         self.assertEqual(self.world.loadtime, 3000)
         self.assertEqual(self.world.turntime, 1000)
         self.assertEqual(self.world.rows, 20)
@@ -97,7 +97,53 @@ class TestAnts(unittest.TestCase):
         self.assertTrue((self.world.view_mask == expected).all())
 
     def test_update(self):
-        self.assertTrue(False)
+        TURN =  ''' f 6 5
+                    w 7 6
+                    a 7 9 1
+                    a 10 8 0
+                    a 10 9 0
+                    h 7 12 1
+                    h 10 5 0
+                    d 8 9 1
+                    d 10 10 0
+                '''
+        self._perform_world_setup()
+        data = [line.strip() for line in TURN.split('\n') if line.strip()]
+        self.world.update(data)
+        # food
+        expected = (np.array([5]), np.array([6]))
+        found = np.where(self.world.map[:, :, 0] == world.FOOD)
+        self.assertTrue((expected == found), msg='FOOD')
+        # water
+        expected = (np.array([6]), np.array([7]))
+        found = np.where(self.world.map[:, :, 0] == world.WATER)
+        self.assertTrue((expected == found), msg='WATER')
+        # own_ants
+        expected = (np.array([8, 9]), np.array([10, 10]))
+        found = np.where(self.world.map[:, :, 0] == world.OWN_ANT)
+        self.assertTrue((expected[0] == found[0]).all() and
+                        (expected[1] == found[1]).all(), msg='OWN ANTS')
+        # enemy_ants
+        expected = (np.array([9]), np.array([7]))
+        found = np.where(self.world.map[:, :, 0] > world.OWN_ANT)
+        self.assertTrue((expected == found), msg='ENEMY ANTS')
+        # own_hills
+        expected = (np.array([5]), np.array([10]))
+        found = np.where(self.world.map[:, :, 0] == world.OWN_HILL)
+        self.assertTrue((expected == found), msg='OWN HILLS')
+        # enemy_hills
+        expected = (np.array([12]), np.array([7]))
+        found = np.where(self.world.map[:, :, 0] < world.OWN_HILL)
+        self.assertTrue((expected == found), msg='ENEMY HILLS')
+        # own_dead
+        expected = (np.array([10]), np.array([10]))
+        found = np.where(self.world.map[:, :, 0] == world.OWN_DEAD)
+        self.assertTrue((expected == found), msg='OWN DEAD')
+        # enemy_dead
+        expected = (np.array([9]), np.array([8]))
+        found = np.where((self.world.map[:, :, 0] > world.OWN_DEAD) &
+                         (self.world.map[:, :, 0] < world.OWN_ANT))
+        self.assertTrue((expected == found), msg='ENEMY DEAD')
 
     def test_diffuse(self):
         self.assertTrue(False)

@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+# -*- coding: utf-8  -*-
 
 '''
 Contest entry for the Fall 2011 challenge on http://aichallenge.org
@@ -9,9 +10,10 @@ It is based off the starter package available online.
 
 import sys
 import traceback
+import subprocess
 import random
 import time
-from numpy import array, zeros, int8, minimum
+from numpy import array, zeros, int8, minimum, where
 from numpy import abs as np_abs
 
 
@@ -24,13 +26,17 @@ __maintainer__ = "Mac Ryan"
 __email__ = "quasipedia@gmail.com"
 __status__ = "Development"
 
+
 # MAP ENTITY DESCRIPTORS
+# The arragement of values is such that all but the "enemy dead ant" case can
+# be checked with equality (entity == x) or major/minor. Enemy ants requires a
+# double check (minor of ... and major of...).
 OWN_HILL = -10  # Other players' ants are -11, -12... [OWN_HILL - owner]
 WATER = -1
 LAND = 0
 FOOD = 1
-OWN_ANT = 10    # Other players' ants are 11, 12... [OWN_ANT + owner]
-OWN_DEAD = 100  # Other players' ants are 101, 102... [OWN_DEAD + owner]
+OWN_DEAD = 10   # Other players' ants are 11, 12... [OWN_DEAD + owner]
+OWN_ANT = 100   # Other players' ants are 101, 102... [OWN_ANT + owner]
 
 # VIEW_MASK
 VISIBLE = True
@@ -74,7 +80,8 @@ class World():
         for k, v in data:
             setattr(self, k, int(v))
         self.map_size = array((self.cols, self.rows))
-        # Generate map and hud
+        # Generate the empty map - the final array contains:
+        # entity_ID, last_seen counter, scent amount
         self.map = zeros((self.cols, self.rows, 3), dtype=float)
         # Generate the field-of-view mask
         mx = int(self.viewradius2**0.5)
@@ -94,16 +101,17 @@ class World():
         # start timer
         self.turn_start_time = time.time()
 
-        # eliminate all temporay objects, keep water + hills.
+        # eliminate all temporay objects, keep water + hills. [cfr. entity ID]
+        self.map[where(self.map[:, :, 0] > LAND)] = LAND
 
         # reset turn variables
         self.food = []
         self.own_ants = []
         self.own_hills = []
-        self.own_deads = []
+        self.own_dead = []
         self.enemy_ants = []
         self.enemy_hills = []
-        self.enemy_deads = []
+        self.enemy_dead = []
 
         # parse input lines
         for line in data:
@@ -112,38 +120,43 @@ class World():
                 row = int(tokens[1])
                 col = int(tokens[2])
                 if tokens[0] == 'w':
-                    self.map[col][row] = WATER
+                    self.map[col][row][0] = WATER
                 elif tokens[0] == 'f':
-                    self.hud[col][row] = FOOD
+                    self.map[col][row][0] = FOOD
                     self.food.append((col, row))
                 else:
                     owner = int(tokens[3])
                     if tokens[0] == 'a':
-                        self.hud[col][row] = OWN_ANT + owner
+                        self.map[col][row][0] = OWN_ANT + owner
                         if not owner:  # owner == 0 --> player's ant
-                            self.own_world.append(array((col, row)))
-                            #TODO: viewmask here
+                            self.own_ants.append(array((col, row)))
                         else:
-                            self.enemy_world.append(array((col, row)))
+                            self.enemy_ants.append(array((col, row)))
                     elif tokens[0] == 'd':
                         # food could spawn on a spot where an ant just died
                         # don't overwrite the space on the hud.
-                        self.hud[col][row] = self.hud[col][row] or DEAD
+                        self.map[col][row][0] = self.map[col][row][0] \
+                                                or OWN_DEAD + owner
                         # but always add to the dead list
                         if not owner:  # owner == 0 --> player's ant
-                            self.own_deads.append(array((col, row)))
+                            self.own_dead.append(array((col, row)))
                         else:
-                            self.enemy_deads.append((array(col, row)))
+                            self.enemy_dead.append(array((col, row)))
                     elif tokens[0] == 'h':
+                        self.map[col][row][0] = OWN_HILL - owner
                         if not owner:  # owner == 0 --> player's hill
                             self.own_hills.append(array((col, row)))
                         else:
                             self.enemy_hills.append(array((col, row)))
 
+        # use view_mask to reset the last_seen counter of visible land
 
         # eliminate hills whose destruction has been positively confirmed
-
-        # use view_mask to reset the last_seen counter of visible land
+        import visualisation
+        vis = visualisation.Visualiser(cols=self.cols, rows=self.rows)
+        vis.render(self.map)
+        vis.save()
+        subprocess.call(['display', 'map.png'])
 
     def diffuse(self, steps=None):
         '''
