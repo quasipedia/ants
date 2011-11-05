@@ -56,7 +56,8 @@ class TestAnts(unittest.TestCase):
         Helper function that perform a standard setup of the world.
         '''
         if text == None:
-            text = '''loadtime 3000
+            text = '''turn 0
+                      loadtime 3000
                       turntime 1000
                       rows 20
                       cols 30
@@ -72,6 +73,7 @@ class TestAnts(unittest.TestCase):
     def test_setup(self):
         self._perform_world_setup()
         # check data has been loaded correctly
+        self.assertEqual(self.world.turn, 0)
         self.assertEqual(self.world.loadtime, 3000)
         self.assertEqual(self.world.turntime, 1000)
         self.assertEqual(self.world.rows, 20)
@@ -86,15 +88,16 @@ class TestAnts(unittest.TestCase):
         # == operator between arrays return an array with boolean values in it.
         self.assertTrue((self.world.map_size == np.array((30, 20))).all())
         # check the viewmask is correctly shaped
-        expected = np.array(
-            [[False, False,  True,  True,  True, False, False],
-             [False,  True,  True,  True,  True,  True, False],
-             [ True,  True,  True,  True,  True,  True,  True],
-             [ True,  True,  True,  True,  True,  True,  True],
-             [ True,  True,  True,  True,  True,  True,  True],
-             [False,  True,  True,  True,  True,  True, False],
-             [False, False,  True,  True,  True, False, False]], dtype=bool)
-        self.assertTrue((self.world.view_mask == expected).all())
+        expected = (np.array([-3, -3, -3, -2, -2, -2, -2, -2, -1, -1, -1,
+                              -1, -1, -1, -1,  0,  0,  0,  0,  0,  0,  0,
+                               1,  1,  1,  1,  1,  1,  1,  2,  2,  2,  2,
+                               2,  3,  3,  3]),
+                    np.array([-1,  0,  1, -2, -1,  0,  1,  2, -3, -2, -1,
+                               0,  1,  2,  3, -3, -2, -1,  0,  1,  2,  3,
+                              -3, -2, -1,  0, 1,  2,  3, -2, -1,  0,  1,
+                               2, -1,  0,  1]))
+        self.assertTrue((self.world.view_mask[0] == expected[0]).all())
+        self.assertTrue((self.world.view_mask[1] == expected[1]).all())
 
     def test_update(self):
         TURN =  ''' f 6 5

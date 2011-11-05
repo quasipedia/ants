@@ -8,7 +8,7 @@ This file is needed by the online game engine, and it exposes the main bot
 to the game API. It is based off the starter package available online.
 '''
 
-from ants import Ants, run
+from world import World, run
 from random import shuffle, choice
 
 
@@ -31,10 +31,10 @@ class MyBot:
     def __init__(self):
         pass
 
-    def do_setup(self, ants):
+    def do_setup(self, world):
         pass
 
-    def _do_turn(self, ants):
+    def _do_turn(self, world):
 
         '''
         This is the raw function invoked by the game engine at each turn.
@@ -43,6 +43,9 @@ class MyBot:
         ``_do_turn()``, but the ``main()`` might wrap the turn into a profiler
         when played locally, hence this intermediate step.
         '''
+        for ant in world.own_ants:
+            world.issue_order((ant, choice(('n', 's', 'e', 'o'))))
+        return
 
         def do_move_direction(loc, direction):
             '''
@@ -50,11 +53,11 @@ class MyBot:
             if the move is impossible or unsafe to perform, True
             otherwise.
             '''
-            new_loc = tuple(ants.destination(loc, direction))
+            new_loc = tuple(world.destination(loc, direction))
             col, row = new_loc
-            if ants.map[new_loc] >= 0 and ants.hud[new_loc] != 10 \
+            if world.map[new_loc] >= 0 and world.hud[new_loc] != 10 \
                                       and new_loc not in orders:
-                ants.issue_order((loc, direction))
+                world.issue_order((loc, direction))
                 orders[new_loc] = loc
                 return True
             else:
@@ -64,7 +67,7 @@ class MyBot:
             '''
             Move the ants toward a location on the map.
             '''
-            directions = ants.direction(loc, dest)
+            directions = world.direction(loc, dest)
             for direction in directions:
                 if do_move_direction(loc, direction):
                     targets[tuple(dest)] = loc
@@ -79,14 +82,14 @@ class MyBot:
         targets = {}
 
         # prevent stepping on own hill
-        for hill_loc in ants.own_hills:
+        for hill_loc in world.own_hills:
             orders[tuple(hill_loc)] = None
 
         # find close food
         ant_dist = []
-        for food_loc in ants.food:
-            for ant_loc in ants.my_ants():
-                dist = ants.manhattan(ant_loc, food_loc)
+        for food_loc in world.food:
+            for ant_loc in world.my_ants():
+                dist = world.manhattan(ant_loc, food_loc)
                 ant_dist.append((dist, ant_loc, food_loc))
         ant_dist.sort()
         for dist, ant_loc, food_loc in ant_dist:
@@ -95,10 +98,10 @@ class MyBot:
 
         # attack hills
         ant_dist = []
-        for hill_loc in ants.enemy_hills:
-            for ant_loc in ants.own_ants:
+        for hill_loc in world.enemy_hills:
+            for ant_loc in world.own_ants:
                 if ant_loc not in orders.values():
-                    dist = ants.manhattan(ant_loc, hill_loc)
+                    dist = world.manhattan(ant_loc, hill_loc)
                     ant_dist.append((dist, ant_loc))
         ant_dist.sort()
         for dist, ant_loc in ant_dist:
@@ -106,22 +109,22 @@ class MyBot:
 
         # explore unseen areas
         directions = ['s','e','w','n']
-        for loc in ants.own_ants:
+        for loc in world.own_ants:
             if tuple(loc) not in orders:
                 do_move_direction(loc, choice(direction))
         #for loc in self.unseen[:]:
-            #if ants.visible(loc):
+            #if world.visible(loc):
                 #self.unseen.remove(loc)
              ##could be a bottleneck so...
-            #if ants.time_remaining() < 200:
+            #if world.time_remaining() < 200:
                 #break
-        #for ant_loc in ants.my_ants():
-            #if ants.time_remaining() < 30:
+        #for ant_loc in world.my_ants():
+            #if world.time_remaining() < 30:
                 #break
             #if ant_loc not in orders.values():
                 #unseen_dist = []
                 #for unseen_loc in self.unseen:
-                    #dist = ants.manhattan(ant_loc, unseen_loc)
+                    #dist = world.manhattan(ant_loc, unseen_loc)
                     #unseen_dist.append((dist, unseen_loc))
                 #unseen_dist.sort()
                 #for dist, unseen_loc in unseen_dist:
@@ -129,8 +132,8 @@ class MyBot:
                         #break
 
         # unblock own hill
-        for hill_loc in ants.own_hills:
-            if hill_loc in ants.own_ants \
+        for hill_loc in world.own_hills:
+            if hill_loc in world.own_ants \
                              and not (tuple(hill_loc) in orders.values()):
                 directions = ['s','e','w','n'][:]
                 shuffle(directions)

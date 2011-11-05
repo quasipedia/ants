@@ -36,6 +36,11 @@ COLOURS = {world.LAND : '#B8860B',          # brown
            world.OWN_DEAD : '#003A00',      # deep green
            world.OWN_DEAD + 1: '#3A0000'}   # deep red
 
+# Convert colour strings to a list of floats ranging 0-1 [cairo format].
+for k, v in COLOURS.items():
+    COLOURS[k] = [int(v[1+i:3+i], 16) / 256.0 for i in range(0, 5, 2)]
+
+
 class Visualiser(object):
 
     '''
@@ -43,15 +48,19 @@ class Visualiser(object):
     '''
 
     def __init__(self, cols=40, rows=40):
-        for k, v in COLOURS.items():
-            COLOURS[k] = self._convert_colours(v)
         self.surface = cr.ImageSurface(cr.FORMAT_ARGB32, cols * TILE_SIZE,
                                                          rows * TILE_SIZE)
         self.ctx = cr.Context(self.surface)
+        self.reset()
+
+    def reset(self):
+        '''
+        Reset the image to full black.
+        '''
         self.ctx.set_source_rgb(0, 0, 0)
         self.ctx.paint()
 
-    def render(self, world_map):
+    def render_map(self, world_map):
         '''
         Render a world map to image.
         '''
@@ -75,11 +84,19 @@ class Visualiser(object):
         for location in locations:
             self._draw_tile(location, COLOURS[world.OWN_DEAD + 1])
 
-    def save(self):
+    def render_visibility(self, world_map):
+        '''
+        Display the areas currently visible by the ants.
+        '''
+        locations = np.transpose(np.where(world_map[:, :, 1] == 0))
+        for location in locations:
+            self._draw_tile(location, COLOURS[world.LAND])
+
+    def save(self, frame):
         '''
         Save the visualisation to file.
         '''
-        self.surface.write_to_png('map.png')
+        self.surface.write_to_png('visualisations/%03d.png' % frame)
 
     def _draw_tile(self, loc, colour):
         '''
@@ -90,10 +107,4 @@ class Visualiser(object):
         self.ctx.set_source_rgba(*colour)
         self.ctx.rectangle(x + 1, y + 1, TILE_SIZE - 1, TILE_SIZE - 1)
         self.ctx.fill()
-
-    def _convert_colours(self, colstr):
-        '''
-        Convert colour strings to a list of floats ranging 0-1 [cairo format].
-        '''
-        return [int(colstr[1+i:3+i], 16) / 256.0 for i in range(0, 5, 2)]
 

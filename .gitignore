@@ -2,9 +2,10 @@ __pycache__/*
 tools/*
 game_logs/*
 old_bots/*
+visualisations/*
 *.pyc
 *.py3c
 *.profile
 *.geany
 bot.zip
-map.png
+

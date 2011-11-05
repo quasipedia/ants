@@ -38,9 +38,26 @@ FOOD = 1
 OWN_DEAD = 10   # Other players' ants are 11, 12... [OWN_DEAD + owner]
 OWN_ANT = 100   # Other players' ants are 101, 102... [OWN_ANT + owner]
 
-# VIEW_MASK
-VISIBLE = True
-FOGGED = False
+# ADDITIONAL SCENT ENTITY DESCRIPTORS
+# These desciptors are not to be used on the map, but only for calculating
+# the scent values or other kind of tests
+ENEMY_HILL = -11
+ENEMY_DEAD = 11
+ENEMY_ANT = 101
+
+# ENTITY SCENTS
+SCENTS = {ENEMY_HILL : 300,
+          OWN_DEAD : 300,
+          FOOD : 200,
+          WATER : -1,
+          ENEMY_ANT: -50,
+          OWN_HILL : -100,
+          OWN_ANT: -100}
+
+# MAP INDEXES
+ENTITY_ID = 0
+LAST_SEEN_COUNTER = 1
+SCENT = 2
 
 AIM = {'n': array((0, -1), int8),
        'e': array((1, 0), int8),
@@ -84,15 +101,22 @@ class World():
         # entity_ID, last_seen counter, scent amount
         self.map = zeros((self.cols, self.rows, 3), dtype=float)
         # Generate the field-of-view mask
-        mx = int(self.viewradius2**0.5)
+        self.viewradiusint = int(self.viewradius2**0.5)
+        mx = self.viewradiusint  # for speed in following loop
         side = mx * 2 + 1
-        self.view_mask = zeros((side, side), dtype=bool)
+        tmp = zeros((side, side), dtype=bool)
         for d_row in range(-mx, mx+1):
             for d_col in range(-mx, mx+1):
-                d = d_row**2 + d_col**2
-                if d <= self.viewradius2:
-                    self.view_mask[mx+d_col][mx+d_row] = VISIBLE
-        self.viewradiusint = mx
+                if d_row**2 + d_col**2 <= self.viewradius2:
+                    tmp[mx+d_col][mx+d_row] = True
+        # At this point `tmp` contains a representation of the field of view,
+        # what we want is coordinate offsets from the ant position
+        tmp = where(tmp)
+        self.view_mask = tuple([value - mx for value in tmp])
+        # Initialise hills set. This happens here as they are not reset at each
+        # update.
+        self.own_hills = set([])
+        self.enemy_hills = set([])
 
     def update(self, data):
         '''
@@ -102,16 +126,18 @@ class World():
         self.turn_start_time = time.time()
 
         # eliminate all temporay objects, keep water + hills. [cfr. entity ID]
-        self.map[where(self.map[:, :, 0] > LAND)] = LAND
+        self.map[:, :, ENTITY_ID][self.map[:, :, ENTITY_ID] > LAND] = LAND
 
-        # reset turn variables
+        # reset turn variables - turn variables are really just redoundant,
+        # given that one could poll the map instead, but they are convenient
+        # and CPU-wise cheap.
         self.food = []
         self.own_ants = []
-        self.own_hills = []
-        self.own_dead = []
         self.enemy_ants = []
-        self.enemy_hills = []
+        self.own_dead = []
         self.enemy_dead = []
+        turn_own_hills = []
+        turn_enemy_hills = []
 
         # parse input lines
         for line in data:
@@ -120,14 +146,14 @@ class World():
                 row = int(tokens[1])
                 col = int(tokens[2])
                 if tokens[0] == 'w':
-                    self.map[col][row][0] = WATER
+                    self.map[col][row][ENTITY_ID] = WATER
                 elif tokens[0] == 'f':
-                    self.map[col][row][0] = FOOD
+                    self.map[col][row][ENTITY_ID] = FOOD
                     self.food.append((col, row))
                 else:
                     owner = int(tokens[3])
                     if tokens[0] == 'a':
-                        self.map[col][row][0] = OWN_ANT + owner
+                        self.map[col][row][ENTITY_ID] = OWN_ANT + owner
                         if not owner:  # owner == 0 --> player's ant
                             self.own_ants.append(array((col, row)))
                         else:
@@ -135,36 +161,77 @@ class World():
                     elif tokens[0] == 'd':
                         # food could spawn on a spot where an ant just died
                         # don't overwrite the space on the hud.
-                        self.map[col][row][0] = self.map[col][row][0] \
-                                                or OWN_DEAD + owner
+                        self.map[col][row][ENTITY_ID] = \
+                            self.map[col][row][ENTITY_ID] or OWN_DEAD + owner
                         # but always add to the dead list
                         if not owner:  # owner == 0 --> player's ant
                             self.own_dead.append(array((col, row)))
                         else:
                             self.enemy_dead.append(array((col, row)))
                     elif tokens[0] == 'h':
-                        self.map[col][row][0] = OWN_HILL - owner
+                        # Hills are not added to the map as they might have an
+                        # ant on top, and the ant gets priority.
                         if not owner:  # owner == 0 --> player's hill
-                            self.own_hills.append(array((col, row)))
+                            turn_own_hills.append((col, row))
                         else:
-                            self.enemy_hills.append(array((col, row)))
+                            turn_enemy_hills.append((col, row))
+            elif tokens[0] == 'turn':
+                self.turn = int(tokens[1])
 
-        # use view_mask to reset the last_seen counter of visible land
+        # increment the last view counter for all the map, then use view_mask
+        # to reset it where land is visible
+        self.map += 0, 1, 0
+        for loc in self.own_ants:
+            self.map[:, :, LAST_SEEN_COUNTER][[(axis + loc[i]) % \
+                    self.map_size[i] for i, axis in \
+                    enumerate(self.view_mask)]] = 0
 
-        # eliminate hills whose destruction has been positively confirmed
-        import visualisation
-        vis = visualisation.Visualiser(cols=self.cols, rows=self.rows)
-        vis.render(self.map)
-        vis.save()
-        subprocess.call(['display', 'map.png'])
+        # hills management - hills need to be managed in a special way given
+        # that they might have an ant on top.
+        for set_, list_, entity in ((self.own_hills, turn_own_hills, OWN_HILL),
+                        (self.enemy_hills, turn_enemy_hills, ENEMY_HILL)):
+            # eliminate hills whose destruction has been positively confirmed
+            for loc in set_:
+                if self.is_visible(loc) and loc not in list_:
+                    set_.remove(loc)
+            # add the new ones
+            for loc in list_:
+                set_.add(loc)
+            # add hills on the map where the spot isn't overlapping anything
+            for loc in set_:
+                col, row = loc
+                if self.map[col, row, ENTITY_ID] == LAND:
+                    self.map[col, row, ENTITY_ID] = entity
+
+    def is_visible(self, loc):
+        '''
+        Return True if the location is currently visible.
+        '''
+        return 0 == self.map[loc[0], loc[1], LAST_SEEN_COUNTER]
 
     def diffuse(self, steps=None):
         '''
         Diffuse scents over the map. Iterate ``step`` times. Default to the
         square of the view radius.
         '''
+        return
         if steps == None:
             steps = world.viewradius2
+        # reset the scents
+        self.map[:, :, SCENT] *= 0
+        # create the starting mask (the mask containing the emitters' values,
+        # which will be used at each step)
+        where(self.map[:, :, ENTITY_ID])
+        for step in steps:
+            pass
+
+        # TODO: remove!!! This is for debugging only!
+        import visualisation
+        vis = visualisation.Visualiser(cols=self.cols, rows=self.rows)
+        vis.render_map(self.map)
+        vis.save(self.turn)
+        subprocess.call(['eog', 'visualisations/000.png'])
+
 
     def issue_order(self, order):
         '''
@@ -209,7 +276,7 @@ def run(bot):
     '''
     Parse input, update game state and call the bot classes do_turn method.
     '''
-    ants = Ants()
+    world = World()
     map_data = []
     while(True):
         try:
@@ -220,13 +287,13 @@ def run(bot):
                 continue  #skip empty lines
             if current_line == 'ready':
                 world.setup(map_data)
-                bot.do_setup(ants)
+                bot.do_setup(world)
                 world.finish_turn()
                 map_data = []
             elif current_line == 'go':
                 world.update(map_data)
                 world.diffuse()
-                bot.do_turn(ants)
+                bot.do_turn(world)
                 world.finish_turn()
                 map_data = []
             else:
