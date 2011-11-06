@@ -92,6 +92,17 @@ class Visualiser(object):
         for location in locations:
             self._draw_tile(location, COLOURS[world.LAND])
 
+    def render_scent(self, world_map):
+        '''
+        Display the scent distribution on the map.
+        '''
+        max_scent = float(world_map[..., world.SCENT].max())
+        cols, rows = world_map.shape[:2]
+        for col in range(cols):
+            for row in range(rows):
+                self._draw_tile((col, row),
+                    (255, 0, 0, world_map[col, row, world.SCENT] / max_scent))
+
     def save(self, frame):
         '''
         Save the visualisation to file.

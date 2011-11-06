@@ -10,10 +10,9 @@ It is based off the starter package available online.
 
 import sys
 import traceback
-import subprocess
 import random
 import time
-from numpy import array, zeros, int8, minimum, where
+from numpy import array, zeros, ones, int8, minimum, where, roll
 from numpy import abs as np_abs
 
 
@@ -41,6 +40,7 @@ OWN_ANT = 100   # Other players' ants are 101, 102... [OWN_ANT + owner]
 # ADDITIONAL SCENT ENTITY DESCRIPTORS
 # These desciptors are not to be used on the map, but only for calculating
 # the scent values or other kind of tests
+EMPTY = -666
 ENEMY_HILL = -11
 ENEMY_DEAD = 11
 ENEMY_ANT = 101
@@ -96,7 +96,7 @@ class World():
         data = [line.split() for line in data]
         for k, v in data:
             setattr(self, k, int(v))
-        self.map_size = array((self.cols, self.rows))
+        self.world_size = array((self.cols, self.rows))
         # Generate the empty map - the final array contains:
         # entity_ID, last_seen counter, scent amount
         self.map = zeros((self.cols, self.rows, 3), dtype=float)
@@ -183,7 +183,7 @@ class World():
         self.map += 0, 1, 0
         for loc in self.own_ants:
             self.map[:, :, LAST_SEEN_COUNTER][[(axis + loc[i]) % \
-                    self.map_size[i] for i, axis in \
+                    self.world_size[i] for i, axis in \
                     enumerate(self.view_mask)]] = 0
 
         # hills management - hills need to be managed in a special way given
@@ -214,24 +214,48 @@ class World():
         Diffuse scents over the map. Iterate ``step`` times. Default to the
         square of the view radius.
         '''
-        return
         if steps == None:
-            steps = world.viewradius2
-        # reset the scents
+            steps = self.viewradius2
+        # RESET THE SCENTS
         self.map[:, :, SCENT] *= 0
-        # create the starting mask (the mask containing the emitters' values,
-        # which will be used at each step)
-        where(self.map[:, :, ENTITY_ID])
-        for step in steps:
-            pass
+
+        # CREATE THE STARTING MASK (emitters' own smell)
+        # 0. empty mask
+        scent_mask = ones(self.world_size) * EMPTY
+        # 1. smelly entities
+        for entity in SCENTS:
+            scent_mask[self.map[:, : , ENTITY_ID] == entity] = SCENTS[entity]
+        # 2. out-of-sight land
+        unseen_idx = (self.map[:, :, ENTITY_ID] == LAND) & \
+                     (self.map[:, :, LAST_SEEN_COUNTER] > 0)
+        scent_mask[unseen_idx] = self.map[unseen_idx, LAST_SEEN_COUNTER]
+        idx = scent_mask != EMPTY
+
+        # CREATE THE BLITTING LAYERS
+        single_layer = zeros(self.world_size)
+        single_layer[idx] = scent_mask[idx]  # seed layer with emitters
+        layers = [single_layer, single_layer.copy()]
+        toggler = False
+
+        # DIFFUSE!
+        for step in range(steps):
+            source = layers[toggler]
+            dest = layers[not toggler]
+            dest *= 0
+            # calculate the scent for each tile
+            for amount, axis in ((1, 0), (1, 1), (-1, 0), (-1, 1)):
+                dest += roll(source, amount, axis=axis)
+            dest /= 4
+            # blit the emitters map
+            dest[idx] = scent_mask[idx]
+        # transfer back to world map
+        self.map[:, :, SCENT] = dest
 
         # TODO: remove!!! This is for debugging only!
         import visualisation
         vis = visualisation.Visualiser(cols=self.cols, rows=self.rows)
-        vis.render_map(self.map)
+        vis.render_scent(self.map)
         vis.save(self.turn)
-        subprocess.call(['eog', 'visualisations/000.png'])
-
 
     def issue_order(self, order):
         '''
@@ -261,7 +285,7 @@ class World():
         Uses the numpy arrays and wrap/warp correctly.
         '''
         absolute = np_abs(loc1 - loc2)  # slightly faster than abs()
-        modular = self.map_size - absolute
+        modular = self.world_size - absolute
         return sum(minimum(absolute, modular))  # slightly faster than a.sum()
 
     def destination(self, loc, direction):
@@ -269,7 +293,7 @@ class World():
         Return target location given the direction.
         Uses the numpy arrays and wrap/warp correctly.
         '''
-        return (loc + AIM[direction]) % self.map_size
+        return (loc + AIM[direction]) % self.world_size
 
 
 def run(bot):

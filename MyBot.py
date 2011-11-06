@@ -179,3 +179,7 @@ if __name__ == '__main__':
         run(bot)
     except KeyboardInterrupt:
         print('ctrl-C, leaving ...')
+
+    # Debug only!
+    import subprocess
+    subprocess.call(['eog', 'visualisations/000.png'])

@@ -86,7 +86,7 @@ class TestAnts(unittest.TestCase):
         # check the map size has been correctly set
         # in the following line "assertEqual" would throw an exception as the
         # == operator between arrays return an array with boolean values in it.
-        self.assertTrue((self.world.map_size == np.array((30, 20))).all())
+        self.assertTrue((self.world.world_size == np.array((30, 20))).all())
         # check the viewmask is correctly shaped
         expected = (np.array([-3, -3, -3, -2, -2, -2, -2, -2, -1, -1, -1,
                               -1, -1, -1, -1,  0,  0,  0,  0,  0,  0,  0,
@@ -148,7 +148,24 @@ class TestAnts(unittest.TestCase):
                          (self.world.map[:, :, 0] < world.OWN_ANT))
         self.assertTrue((expected == found), msg='ENEMY DEAD')
 
+    def test_is_visible(self):
+        self.assertTrue(False)
+
     def test_diffuse(self):
+        TURN =  ''' f 6 5
+                    w 7 6
+                    a 7 9 1
+                    a 10 8 0
+                    a 10 9 0
+                    h 7 12 1
+                    h 10 5 0
+                    d 8 9 1
+                    d 10 10 0
+                '''
+        self._perform_world_setup()
+        data = [line.strip() for line in TURN.split('\n') if line.strip()]
+        self.world.update(data)
+        self.world.diffuse()
         self.assertTrue(False)
 
     def test_issue_order(self):
@@ -173,7 +190,7 @@ class TestAnts(unittest.TestCase):
         self.assertTrue(self.world.time_remaining() < 0)
 
     def test_manhattan(self):
-        self.world.map_size = np.array((6, 8))  #0 to 5 and 0 to 7!!
+        self.world.world_size = np.array((6, 8))  #0 to 5 and 0 to 7!!
         p1 = np.array((0, 0))
         p2 = np.array((1, 1))
         p3 = np.array((3, 3))
