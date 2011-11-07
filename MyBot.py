@@ -39,7 +39,6 @@ class Bot(object):
         received and parsed from the game engine, but before the match
         starts. '''
         world = self.world
-        bootstrap.set_profiling(self)
 
     def _do_turn(self):
         '''

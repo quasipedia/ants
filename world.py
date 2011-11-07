@@ -94,6 +94,9 @@ class World():
           - spawnradius2   # food gathering radius squared (unfortunate name)
           - player_seed    # seed for random number generator
         '''
+        # start timer
+        self.turn_start_time = time.time()
+
         # Store received data
         data = [line.split() for line in data]
         for k, v in data:
@@ -121,7 +124,7 @@ class World():
         self.own_hills = set([])
         self.enemy_hills = set([])
 
-    def update(self, data):
+    def _update(self, data):
         '''
         Parse engine input, updating the map.
         '''
@@ -280,7 +283,8 @@ class World():
         Milliseconds before turn end.
         '''
         elapsed = int(1000 * (time.time() - self.turn_start_time))
-        return self.turntime - elapsed
+        reference = self.turntime if self.turn > 0 else self.loadtime
+        return reference - elapsed
 
     def manhattan(self, loc1, loc2):
         '''

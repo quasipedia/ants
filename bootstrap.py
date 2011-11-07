@@ -21,39 +21,54 @@ __status__ = "Development"
 
 
 PROFILING_DIR = 'profiling'
+FULL_LOOP_F = '%s/full_loops' % PROFILING_DIR
+BOT_DO_TURN_F = '%s/do_turn' % PROFILING_DIR
+WORLD_UPDATE_F = '%s/update_world' % PROFILING_DIR
+
+# Set the ``RUNS_LOCALLY`` flag
+try:
+    f = open('do_profile')
+    f.close()
+    import visualisation
+    import cProfile
+    from time import time
+    RUNS_LOCALLY = True
+except IOError:
+    bot.do_turn = bot._do_turn
+    RUNS_LOCALLY = False
 
 
-def set_profiling(bot):
+def set_bot_profiling(bot):
     '''
-    Establish if the bot is running locally, in which case we want to have
-    profiling and logging enabled. Profiling is done if the file named
-    ``do_profile`` is present in the directoy where the code is ran.
+    Set the bot to be profiled.
     '''
-    try:
-        f = open('do_profile')
-        f.close()
-        # Imports
-        import visualisation
-        import cProfile
-        from time import time
-        # Timing turns
-        timings = open('%s/turns_lengths' % PROFILING_DIR, 'w')
-        # Profiling the code
+    if RUNS_LOCALLY:
         profiler = cProfile.Profile()
         def profiled_turn(*args, **kwargs):
-            start = time()
             profiler.runcall(bot._do_turn, *args, **kwargs)
-            timings.write('%.3f ' % (time() - start))
-            timings.flush()
-            profiler.dump_stats('%s/last_run' % PROFILING_DIR)
+            profiler.dump_stats(BOT_DO_TURN_F)
             # Dumping the scent visualisation
             #w = args[0]
             #vis = visualisation.Visualiser(cols=w.cols, rows=w.rows)
             #vis.render_scent(w.map)
             #vis.save(w.turn)
         bot.do_turn = profiled_turn
-    except IOError:
+    else:
         bot.do_turn = bot._do_turn
+
+
+def set_world_profiling(world):
+    '''
+    Set the world to be profiled.
+    '''
+    if RUNS_LOCALLY:
+        profiler = cProfile.Profile()
+        def profiled_update(*args, **kwargs):
+            profiler.runcall(world._update, *args, **kwargs)
+            profiler.dump_stats(WORLD_UPDATE_F)
+        world.update = profiled_update
+    else:
+        world.update = world._update
 
 
 def run():
@@ -62,8 +77,21 @@ def run():
     engine.
     '''
     world = World()
+    set_world_profiling(world)
     bot = Bot(world)
+    set_bot_profiling(bot)
     data = []
+    if RUNS_LOCALLY:
+        timings = open(FULL_LOOP_F, 'w')
+
+    def finish():
+        world.finish_turn()
+        data = []
+        if RUNS_LOCALLY:
+            timings.write('TURN %3d : %.3f\n' %
+                         (world.turn, (time() - world.turn_start_time)))
+            timings.flush()
+
     while(True):
         try:
             current_line = sys.stdin.readline().strip().lower()
@@ -72,13 +100,11 @@ def run():
             if current_line == 'ready':
                 world.setup(data)
                 bot.do_setup()
-                world.finish_turn()
-                data = []
+                finish()
             elif current_line == 'go':
                 world.update(data)
                 bot.do_turn()
-                world.finish_turn()
-                data = []
+                finish()
             else:
                 data.append(current_line)
         except EOFError:  # game is over or game engine has crashed
@@ -89,4 +115,4 @@ def run():
             import traceback
             traceback.print_exc(file=sys.stderr)
             sys.stderr.flush()
-
+    timings.close()
