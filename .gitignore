@@ -3,9 +3,9 @@ tools/*
 game_logs/*
 old_bots/*
 visualisations/*
+profiling/*
 *.pyc
 *.py3c
-*.profile
 *.geany
 bot.zip
 

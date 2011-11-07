@@ -5,13 +5,11 @@
 Contest entry for the Fall 2011 challenge on http://aichallenge.org
 
 This file parses the game engine output and contains a game state class.
-It is based off the starter package available online.
 '''
 
 import sys
-import traceback
-import random
 import time
+
 from numpy import array, zeros, ones, int8, minimum, where, roll
 from numpy import abs as np_abs
 
@@ -49,10 +47,10 @@ ENEMY_ANT = 101
 SCENTS = {ENEMY_HILL : 300,
           OWN_DEAD : 300,
           FOOD : 200,
-          WATER : -10,
-          ENEMY_ANT: 0,
-          OWN_HILL : -10,
-          OWN_ANT: -10}
+          WATER : 0,
+          ENEMY_ANT: 100,
+          OWN_HILL : 0,
+          OWN_ANT: 0}
 
 # SCENT OF UNSEEN TERRITORY
 LAST_SEEN_COUNTER_STEP = 1
@@ -210,11 +208,8 @@ class World():
                 if self.map[col, row, ENTITY_ID] == LAND:
                     self.map[col, row, ENTITY_ID] = entity
 
-    def is_visible(self, loc):
-        '''
-        Return True if the location is currently visible.
-        '''
-        return 0 == self.map[loc[0], loc[1], LAST_SEEN_COUNTER]
+        # perform diffusion
+        self.diffuse()
 
     def diffuse(self, steps=None):
         '''
@@ -222,7 +217,7 @@ class World():
         square of the view radius.
         '''
         if steps == None:
-            steps = 500
+            steps = 100
         # RESET THE SCENTS
         self.map[:, :, SCENT] *= 0
 
@@ -259,11 +254,11 @@ class World():
         # transfer back to world map
         self.map[:, :, SCENT] = dest
 
-        # TODO: remove!!! This is for debugging only!
-        import visualisation
-        vis = visualisation.Visualiser(cols=self.cols, rows=self.rows)
-        vis.render_scent(self.map)
-        vis.save(self.turn)
+    def is_visible(self, loc):
+        '''
+        Return True if the location is currently visible.
+        '''
+        return 0 == self.map[loc[0], loc[1], LAST_SEEN_COUNTER]
 
     def issue_order(self, order):
         '''
@@ -314,40 +309,3 @@ class World():
             scent = self.map[..., SCENT][destination]
             result.append((scent, destination, direction))
         return sorted(result, reverse=True)
-
-
-def run(bot):
-    '''
-    Parse input, update game state and call the bot classes do_turn method.
-    '''
-    world = World()
-    map_data = []
-    while(True):
-        try:
-            # This is where input validation should happen (modify case,
-            # strip whitespaces, skip empty lines...)
-            current_line = sys.stdin.readline().strip().lower()
-            if not current_line:
-                continue  #skip empty lines
-            if current_line == 'ready':
-                world.setup(map_data)
-                bot.do_setup(world)
-                world.finish_turn()
-                map_data = []
-            elif current_line == 'go':
-                world.update(map_data)
-                world.diffuse()
-                bot.do_turn(world)
-                world.finish_turn()
-                map_data = []
-            else:
-                map_data.append(current_line)
-        except EOFError:
-            break
-        except KeyboardInterrupt:
-            raise
-        except:
-            # don't raise error or return so that bot attempts to stay alive
-            traceback.print_exc(file=sys.stderr)
-            sys.stderr.flush()
-

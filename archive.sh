@@ -7,4 +7,4 @@ if [ ! $1 ]
 fi
 TARGET=old_bots/$1
 mkdir $TARGET
-cp *.py *.py3 $TARGET
+cp *.py $TARGET
