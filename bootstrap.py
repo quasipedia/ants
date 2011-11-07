@@ -34,7 +34,6 @@ try:
     from time import time
     RUNS_LOCALLY = True
 except IOError:
-    bot.do_turn = bot._do_turn
     RUNS_LOCALLY = False
 
 
@@ -86,7 +85,7 @@ def run():
 
     def finish():
         world.finish_turn()
-        data = []
+        data[:] = []  #data = [] would be considered local within "finish()"
         if RUNS_LOCALLY:
             timings.write('TURN %3d : %.3f\n' %
                          (world.turn, (time() - world.turn_start_time)))

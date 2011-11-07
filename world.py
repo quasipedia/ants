@@ -8,7 +8,7 @@ This file parses the game engine output and contains a game state class.
 '''
 
 import sys
-import time
+from time import time
 
 from numpy import array, zeros, ones, int8, minimum, where, roll
 from numpy import abs as np_abs
@@ -46,9 +46,9 @@ ENEMY_ANT = 101
 # ENTITY SCENTS
 SCENTS = {ENEMY_HILL : 300,
           OWN_DEAD : 300,
-          FOOD : 200,
+          FOOD : 20,
           WATER : 0,
-          ENEMY_ANT: 100,
+          ENEMY_ANT: 10,
           OWN_HILL : 0,
           OWN_ANT: 0}
 
@@ -95,7 +95,7 @@ class World():
           - player_seed    # seed for random number generator
         '''
         # start timer
-        self.turn_start_time = time.time()
+        self.turn_start_time = time()
 
         # Store received data
         data = [line.split() for line in data]
@@ -129,7 +129,7 @@ class World():
         Parse engine input, updating the map.
         '''
         # start timer
-        self.turn_start_time = time.time()
+        self.turn_start_time = time()
 
         # eliminate all temporay objects, keep water + hills. [cfr. entity ID]
         self.map[:, :, ENTITY_ID][self.map[:, :, ENTITY_ID] > LAND] = LAND
@@ -214,13 +214,23 @@ class World():
         # perform diffusion
         self.diffuse()
 
-    def diffuse(self, steps=None):
+
+    def diffuse(self, abs_left=None, perc_left=None):
         '''
-        Diffuse scents over the map. Iterate ``step`` times. Default to the
-        square of the view radius.
+        Diffuse scents over the map. Diffusion progresses until the time left
+        to the end of the turn equals ``abs_left``. Specify the time that must
+        be left at the end of the diffusion process by either its absolute
+        value in ms or as percentage of the turn length.
+        - abs_limit  : milliseconds to leave after diffusion
+        - perc_limit : percentage of turn time to leave after diffusion
         '''
-        if steps == None:
-            steps = 100
+        # EVALUATE WHEN TO STOP
+        if abs_left == perc_left == None:
+            perc_left = 0.25
+        if abs_left is None:
+            abs_left = self.turntime * perc_left
+        hard_limit = self.turn_start_time + (self.turntime - abs_left) / 1000.0
+
         # RESET THE SCENTS
         self.map[:, :, SCENT] *= 0
 
@@ -243,7 +253,9 @@ class World():
         toggler = False
 
         # DIFFUSE!
-        for step in range(steps):
+#        counter = 0
+        while time() < hard_limit:
+#            counter += 1
             toggler = not toggler
             source = layers[toggler]
             dest = layers[not toggler]
@@ -256,6 +268,8 @@ class World():
             dest[idx] = scent_mask[idx]
         # transfer back to world map
         self.map[:, :, SCENT] = dest
+#        sys.stdout.write('Diffusion steps: %s \nleft: %s\n' % (counter,
+#            ((self.turn_start_time + self.turntime/1000.0 - time()) * 1000)))
 
     def is_visible(self, loc):
         '''
@@ -282,7 +296,7 @@ class World():
         '''
         Milliseconds before turn end.
         '''
-        elapsed = int(1000 * (time.time() - self.turn_start_time))
+        elapsed = int(1000 * (time() - self.turn_start_time))
         reference = self.turntime if self.turn > 0 else self.loadtime
         return reference - elapsed
 

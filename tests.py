@@ -112,7 +112,7 @@ class TestAnts(unittest.TestCase):
                 '''
         self._perform_world_setup()
         data = [line.strip() for line in TURN.split('\n') if line.strip()]
-        self.world.update(data)
+        self.world._update(data)
         # food
         expected = (np.array([5]), np.array([6]))
         found = np.where(self.world.map[:, :, 0] == world.FOOD)
@@ -126,6 +126,10 @@ class TestAnts(unittest.TestCase):
         found = np.where(self.world.map[:, :, 0] == world.OWN_ANT)
         self.assertTrue((expected[0] == found[0]).all() and
                         (expected[1] == found[1]).all(), msg='OWN ANTS')
+        # regression bug - "not a player's ant" error
+        set1 = set(zip(*[tuple(el) for el in expected]))
+        set2 = set([tuple(el) for el in self.world.own_ants])
+        self.assertEqual(set1, set2)
         # enemy_ants
         expected = (np.array([9]), np.array([7]))
         found = np.where(self.world.map[:, :, 0] > world.OWN_ANT)
@@ -164,7 +168,7 @@ class TestAnts(unittest.TestCase):
                 '''
         self._perform_world_setup()
         data = [line.strip() for line in TURN.split('\n') if line.strip()]
-        self.world.update(data)
+        self.world._update(data)
         self.world.diffuse()
         self.assertTrue(False)
 
@@ -182,6 +186,7 @@ class TestAnts(unittest.TestCase):
         self.assertEqual('go', self._read_output()[0])
 
     def test_time_remaining(self):
+        self.world.turn = 1
         self.world.turntime = 50
         self.world.turn_start_time = time.time()
         time.sleep(0.010)
@@ -225,4 +230,4 @@ class TestAnts(unittest.TestCase):
               msg='%s' % self.world.destination(location, direction))
 
     def get_scent_direction(self):
-        self.assertTrue(False
+        self.assertTrue(False)
