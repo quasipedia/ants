@@ -96,12 +96,17 @@ class Visualiser(object):
         '''
         Display the scent distribution on the map.
         '''
-        max_scent = float(world_map[..., world.SCENT].max())
+        max_scent = max([abs(e) for e in world.SCENTS.values()])
         cols, rows = world_map.shape[:2]
         for col in range(cols):
             for row in range(rows):
-                self._draw_tile((col, row),
-                    (255, 0, 0, world_map[col, row, world.SCENT] / max_scent))
+                alpha = world_map[col, row, world.SCENT] / max_scent
+                # red = go | blue = no-go
+                colour = (1, 0, 0, alpha) if alpha > 0 else (0, 0, 1, -alpha)
+                self._draw_tile((col, row), colour)
+        locations = zip(*np.where(world_map[:, :, 0] == world.OWN_ANT))
+        for location in locations:
+            self._draw_tile(location, COLOURS[world.OWN_ANT])
 
     def save(self, frame):
         '''

@@ -49,20 +49,24 @@ ENEMY_ANT = 101
 SCENTS = {ENEMY_HILL : 300,
           OWN_DEAD : 300,
           FOOD : 200,
-          WATER : -1,
-          ENEMY_ANT: -50,
-          OWN_HILL : -100,
-          OWN_ANT: -100}
+          WATER : -10,
+          ENEMY_ANT: 0,
+          OWN_HILL : -10,
+          OWN_ANT: -10}
+
+# SCENT OF UNSEEN TERRITORY
+LAST_SEEN_COUNTER_STEP = 1
+INITIAL_LAST_SEEN_COUNTER = 30
 
 # MAP INDEXES
 ENTITY_ID = 0
 LAST_SEEN_COUNTER = 1
 SCENT = 2
 
-AIM = {'n': array((0, -1), int8),
-       'e': array((1, 0), int8),
-       's': array((0, 1), int8),
-       'w': array((-1, 0), int8)}
+DIRECTIONS = {'n': array((0, -1), int8),
+              'e': array((1, 0), int8),
+              's': array((0, 1), int8),
+              'w': array((-1, 0), int8)}
 
 
 class World():
@@ -100,6 +104,7 @@ class World():
         # Generate the empty map - the final array contains:
         # entity_ID, last_seen counter, scent amount
         self.map = zeros((self.cols, self.rows, 3), dtype=float)
+        self.map[..., LAST_SEEN_COUNTER] = INITIAL_LAST_SEEN_COUNTER
         # Generate the field-of-view mask
         self.viewradiusint = int(self.viewradius2**0.5)
         mx = self.viewradiusint  # for speed in following loop
@@ -180,7 +185,7 @@ class World():
 
         # increment the last view counter for all the map, then use view_mask
         # to reset it where land is visible
-        self.map += 0, 1, 0
+        self.map += 0, LAST_SEEN_COUNTER_STEP, 0
         for loc in self.own_ants:
             self.map[:, :, LAST_SEEN_COUNTER][[(axis + loc[i]) % \
                     self.world_size[i] for i, axis in \
@@ -191,7 +196,9 @@ class World():
         for set_, list_, entity in ((self.own_hills, turn_own_hills, OWN_HILL),
                         (self.enemy_hills, turn_enemy_hills, ENEMY_HILL)):
             # eliminate hills whose destruction has been positively confirmed
-            for loc in set_:
+            # use a copy of the set to prevent modifying it's size during
+            # iteration.
+            for loc in set_.copy():
                 if self.is_visible(loc) and loc not in list_:
                     set_.remove(loc)
             # add the new ones
@@ -215,7 +222,7 @@ class World():
         square of the view radius.
         '''
         if steps == None:
-            steps = self.viewradius2
+            steps = 500
         # RESET THE SCENTS
         self.map[:, :, SCENT] *= 0
 
@@ -239,12 +246,13 @@ class World():
 
         # DIFFUSE!
         for step in range(steps):
+            toggler = not toggler
             source = layers[toggler]
             dest = layers[not toggler]
             dest *= 0
             # calculate the scent for each tile
             for amount, axis in ((1, 0), (1, 1), (-1, 0), (-1, 1)):
-                dest += roll(source, amount, axis=axis)
+                dest += roll(source, amount, axis=axis)  #may be cached for sp!
             dest /= 4
             # blit the emitters map
             dest[idx] = scent_mask[idx]
@@ -293,7 +301,19 @@ class World():
         Return target location given the direction.
         Uses the numpy arrays and wrap/warp correctly.
         '''
-        return (loc + AIM[direction]) % self.world_size
+        return (loc + DIRECTIONS[direction]) % self.world_size
+
+    def get_scent_strengths(self, loc):
+        '''
+        Return a list of tuples (scent, destination, direction) sorted
+        according to scent intensity.
+        '''
+        result = []
+        for direction, offset in DIRECTIONS.items():
+            destination = tuple((loc + offset) % self.world_size)
+            scent = self.map[..., SCENT][destination]
+            result.append((scent, destination, direction))
+        return sorted(result, reverse=True)
 
 
 def run(bot):

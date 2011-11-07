@@ -35,7 +35,6 @@ class MyBot:
         pass
 
     def _do_turn(self, world):
-
         '''
         This is the raw function invoked by the game engine at each turn.
 
@@ -43,9 +42,18 @@ class MyBot:
         ``_do_turn()``, but the ``main()`` might wrap the turn into a profiler
         when played locally, hence this intermediate step.
         '''
+        destinations = []
         for ant in world.own_ants:
-            world.issue_order((ant, choice(('n', 's', 'e', 'o'))))
-        return
+            scents_by_strength = world.get_scent_strengths(ant)
+            for scent, destination, direction in scents_by_strength:
+                if destination not in destinations:
+                    world.issue_order((ant, direction))
+                    destinations.append(destination)
+                    break
+
+        #######################
+        return  # LOOOK HERE!!!
+        #######################
 
         def do_move_direction(loc, direction):
             '''

@@ -224,4 +224,5 @@ class TestAnts(unittest.TestCase):
               (expected == self.world.destination(location, direction)).all(),
               msg='%s' % self.world.destination(location, direction))
 
-
+    def get_scent_direction(self):
+        self.assertTrue(False
