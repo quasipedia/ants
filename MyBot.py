@@ -13,6 +13,11 @@ from random import shuffle, choice
 import bootstrap
 from world import LAND, ENTITY_ID
 
+from checklocal import RUNS_LOCALLY
+if RUNS_LOCALLY:
+    import logging
+    log = logging.getLogger('main')
+
 
 __author__ = "Mac Ryan"
 __copyright__ = "Copyright 2011, Mac Ryan"
@@ -63,6 +68,11 @@ class Bot(object):
                     break
             if not will_move:
                 destinations.append(tuple(ant))
+        log.info('AI : done.')
+
+        #import sys
+        #sys.stdout.write('v circle(5.0,5.0,20.0,true);\n')
+        #sys.stdout.write('v circle 5 5 20 true\n')
 
 
 if __name__ == '__main__':

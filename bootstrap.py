@@ -9,6 +9,12 @@ import sys
 
 from world import World
 from MyBot import Bot
+from checklocal import RUNS_LOCALLY
+
+if RUNS_LOCALLY:
+    import visualisation
+    import cProfile
+    from time import time
 
 __author__ = "Mac Ryan"
 __copyright__ = "Copyright 2011, Mac Ryan"
@@ -24,17 +30,6 @@ PROFILING_DIR = 'profiling'
 FULL_LOOP_F = '%s/full_loops' % PROFILING_DIR
 BOT_DO_TURN_F = '%s/do_turn' % PROFILING_DIR
 WORLD_UPDATE_F = '%s/update_world' % PROFILING_DIR
-
-# Set the ``RUNS_LOCALLY`` flag
-try:
-    f = open('do_profile')
-    f.close()
-    import visualisation
-    import cProfile
-    from time import time
-    RUNS_LOCALLY = True
-except IOError:
-    RUNS_LOCALLY = False
 
 
 def set_bot_profiling(bot):
@@ -79,18 +74,10 @@ def run():
     set_world_profiling(world)
     bot = Bot(world)
     set_bot_profiling(bot)
-    data = []
     if RUNS_LOCALLY:
-        timings = open(FULL_LOOP_F, 'w')
-
-    def finish():
-        world.finish_turn()
-        data[:] = []  #data = [] would be considered local within "finish()"
-        if RUNS_LOCALLY:
-            timings.write('TURN %3d : %.3f\n' %
-                         (world.turn, (time() - world.turn_start_time)))
-            timings.flush()
-
+        import logging
+        log = logging.getLogger('main')
+    data = []
     while(True):
         try:
             current_line = sys.stdin.readline().strip().lower()
@@ -99,11 +86,13 @@ def run():
             if current_line == 'ready':
                 world.setup(data)
                 bot.do_setup()
-                finish()
+                world.finish_turn()
+                data = []
             elif current_line == 'go':
                 world.update(data)
                 bot.do_turn()
-                finish()
+                world.finish_turn()
+                data = []
             else:
                 data.append(current_line)
         except EOFError:  # game is over or game engine has crashed
@@ -114,4 +103,3 @@ def run():
             import traceback
             traceback.print_exc(file=sys.stderr)
             sys.stderr.flush()
-    timings.close()

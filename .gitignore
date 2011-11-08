@@ -1,5 +1,7 @@
 __pycache__/*
+tools
 tools/*
+tools_old/*
 game_logs/*
 old_bots/*
 visualisations/*

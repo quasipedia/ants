@@ -13,6 +13,11 @@ from time import time
 from numpy import array, zeros, ones, int8, minimum, where, roll
 from numpy import abs as np_abs
 
+from checklocal import RUNS_LOCALLY
+if RUNS_LOCALLY:
+    import logging
+    log = logging.getLogger('main')
+
 
 __author__ = "Mac Ryan"
 __copyright__ = "Copyright 2011, Mac Ryan"
@@ -123,6 +128,10 @@ class World():
         # update.
         self.own_hills = set([])
         self.enemy_hills = set([])
+        if RUNS_LOCALLY:
+            log.info('####### NEW GAME! ########')
+            log.info('STARTUP DATA: %s' % data)
+
 
     def _update(self, data):
         '''
@@ -130,6 +139,9 @@ class World():
         '''
         # start timer
         self.turn_start_time = time()
+
+        if RUNS_LOCALLY:
+            log.info('** TURN %0d3 **' % self.turn)
 
         # eliminate all temporay objects, keep water + hills. [cfr. entity ID]
         self.map[:, :, ENTITY_ID][self.map[:, :, ENTITY_ID] > LAND] = LAND
@@ -253,9 +265,9 @@ class World():
         toggler = False
 
         # DIFFUSE!
-#        counter = 0
+        counter = 0
         while time() < hard_limit:
-#            counter += 1
+            counter += 1
             toggler = not toggler
             source = layers[toggler]
             dest = layers[not toggler]
@@ -268,8 +280,9 @@ class World():
             dest[idx] = scent_mask[idx]
         # transfer back to world map
         self.map[:, :, SCENT] = dest
-#        sys.stdout.write('Diffusion steps: %s \nleft: %s\n' % (counter,
-#            ((self.turn_start_time + self.turntime/1000.0 - time()) * 1000)))
+        if RUNS_LOCALLY:
+            log.info('DIFFUSE : %04d passes - ms left: %d' % (counter,
+                (self.turn_start_time + self.turntime/1000.0 - time()) * 1000))
 
     def is_visible(self, loc):
         '''
@@ -291,6 +304,9 @@ class World():
         '''
         sys.stdout.write('go\n')
         sys.stdout.flush()
+        if RUNS_LOCALLY:
+            duration = int((time() - self.turn_start_time) * 1000)
+            log.info('TURN DURATION: %d ms' % duration)
 
     def time_remaining(self):
         '''
