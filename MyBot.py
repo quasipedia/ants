@@ -11,7 +11,7 @@ to the game API.
 from random import shuffle, choice
 
 import bootstrap
-from world import LAND, ENTITY_ID
+from world import LAND, ENTITY_ID, OWN_HILL
 
 from checklocal import RUNS_LOCALLY
 if RUNS_LOCALLY:
@@ -61,7 +61,8 @@ class Bot(object):
             for scent, dest, direction in scents_by_strength:
                 dest = tuple(dest)
                 if not dest in destinations \
-                   and world.map[dest][ENTITY_ID] == LAND:
+                   and (world.map[dest][ENTITY_ID] == LAND or
+                        world.map[dest][ENTITY_ID] < OWN_HILL):
                     world.issue_order((ant, direction))
                     destinations.append(dest)
                     will_move = True

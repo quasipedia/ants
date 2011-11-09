@@ -21,6 +21,12 @@ __status__ = "Development"
 
 class Overlay(object):
 
+    '''
+    Define new representable entities and commodity functions.
+    Note that the js visualiser API requires coordinates in the form (row, col)
+    rather than (col, row).
+    '''
+
     def target_bot(self, bot):
         self.bot = bot
         self.world = bot.world
@@ -30,8 +36,8 @@ class Overlay(object):
         Own dead ants: white empty circle
         '''
         dead = self.world.own_dead
-        for col, row in dead:
-            sys.stdout.write('v circle %d %d 1.5 false\n' % (col, row))
+        for (col, row), counter in dead:
+            sys.stdout.write('v circle %d %d 1.2 false\n' % (row, col))
 
     def show_all(self):
         self.show_own_dead()

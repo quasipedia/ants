@@ -54,12 +54,11 @@ ENEMY_ANT = 101
 # straight line of ¼ of its intensity, using it is possible to say that the
 # scent of an object whose smell is 4**4 is at 4 tiles distance the same of an
 # object 4**1 at 1 tile distance.
-SCENTS = {ENEMY_HILL : 4**5,
-          OWN_DEAD : 4**5,
-          FOOD : 4**4,
+SCENTS = {ENEMY_HILL : 4 ** 6,
+          FOOD : 4 ** 3,
+          ENEMY_ANT: 4 ** 2,
           WATER : 0,
-          ENEMY_ANT: 0,
-          OWN_HILL : 0,
+          OWN_HILL: 0,
           OWN_ANT: 0}
 
 # SCENT OF UNSEEN TERRITORY
@@ -67,10 +66,15 @@ LAST_SEEN_COUNTER_STEP = 1
 INITIAL_LAST_SEEN_COUNTER = 1
 UNSEEN_LAND_SMELL = 4 ** 1
 
+# SCENT OF OWN DEAD
+OWN_DEAD_FADING_COUNTER = 10
+OWN_DEAD_SCENT = 4**5
+
 # MAP INDEXES
 ENTITY_ID = 0
 LAST_SEEN_COUNTER = 1
 SCENT = 2
+
 
 DIRECTIONS = {'n': array((0, -1), int8),
               'e': array((1, 0), int8),
@@ -127,10 +131,11 @@ class World():
         self.view_mask = self._get_circular_mask(mx)
         # Generate the diffusion range for enemy hills.
         self.enemy_hill_diffusion_mask = self._get_circular_mask(2 * mx)
-        # Initialise hills set. This happens here as they are not reset at each
-        # update.
+        # Initialise hills and own_dead list/sets. This happens here as they
+        # are not reset at each update.
         self.own_hills = set([])
         self.enemy_hills = set([])
+        self.own_dead = []
         if RUNS_LOCALLY:
             log.info('####### NEW GAME! ########')
             log.info('STARTUP DATA : %s' % data)
@@ -140,27 +145,27 @@ class World():
         '''
         Parse engine input, updating the map.
         '''
-        # start timer
+        # START TIMER
         self.turn_start_time = time()
 
         if RUNS_LOCALLY:
             log.info('** TURN %03d **' % self.turn)
 
-        # eliminate all temporay objects, keep water + hills. [cfr. entity ID]
+        # ELIMINATE ALL TEMPORAY OBJECTS, keep water + hills. [cfr. entity ID]
         self.map[:, :, ENTITY_ID][self.map[:, :, ENTITY_ID] > LAND] = LAND
 
-        # reset turn variables - turn variables are really just redoundant,
+        # RESET TURN VARIABLES - turn variables are really just redoundant,
         # given that one could poll the map instead, but they are convenient
         # and CPU-wise cheap.
         self.food = []
         self.own_ants = []
         self.enemy_ants = []
-        self.own_dead = []
         self.enemy_dead = []
+        turn_own_dead = []
         turn_own_hills = []
         turn_enemy_hills = []
 
-        # parse input lines
+        # PARSE INPUT LINES
         for line in data:
             tokens = line.split()
             if len(tokens) >= 3:
@@ -186,7 +191,7 @@ class World():
                             self.map[col][row][ENTITY_ID] or OWN_DEAD + owner
                         # but always add to the dead list
                         if not owner:  # owner == 0 --> player's ant
-                            self.own_dead.append(array((col, row)))
+                            turn_own_dead.append(array((col, row)))
                         else:
                             self.enemy_dead.append(array((col, row)))
                     elif tokens[0] == 'h':
@@ -200,7 +205,7 @@ class World():
                 self.turn = int(tokens[1])
                 self.turns_left = self.turns - self.turn
 
-        # increment the last view counter for all the map, then use view_mask
+        # INCREMENT THE LAST VIEW COUNTER for all the map, then use view_mask
         # to reset it where land is visible
         self.map += 0, LAST_SEEN_COUNTER_STEP, 0
         for loc in self.own_ants:
@@ -208,7 +213,7 @@ class World():
                     self.world_size[i] for i, axis in \
                     enumerate(self.view_mask)]] = 0
 
-        # hills management - hills need to be managed in a special way given
+        # HILLS MANAGEMENT - hills need to be managed in a special way given
         # that they might have an ant on top.
         for set_, list_, entity in ((self.own_hills, turn_own_hills, OWN_HILL),
                         (self.enemy_hills, turn_enemy_hills, ENEMY_HILL)):
@@ -227,7 +232,17 @@ class World():
                 if self.map[col, row, ENTITY_ID] == LAND:
                     self.map[col, row, ENTITY_ID] = entity
 
-        # perform diffusion
+        # OWN_DEAD MANAGEMENT - own_dead need to be managed in a special way as
+        # they are shown as input only during the turn after they have been
+        # killed. We want contrarily to have their scent gradually fading post-
+        # mortem, in order to attract more ants on the crime scene.
+        for idx, pair_ in enumerate(self.own_dead):
+            pair_[1] -= 1
+        self.own_dead = filter(lambda p : p[1] > 0, self.own_dead)
+        for ant in turn_own_dead:
+            self.own_dead.append([ant, OWN_DEAD_FADING_COUNTER])
+
+        # PERFORM DIFFUSION
         self.diffuse()
 
 
@@ -242,7 +257,7 @@ class World():
         '''
         # EVALUATE WHEN TO STOP
         if abs_left == perc_left == None:
-            perc_left = 0.5
+            perc_left = 0.5 if RUNS_LOCALLY else 0.15  #gives time for profil
         if abs_left is None:
             abs_left = self.turntime * perc_left
         hard_time_limit = self.turn_start_time + \
@@ -268,7 +283,15 @@ class World():
         to_sum_idx = logical_and(unseen_idx, scent_mask > EMPTY)
         scent_mask[to_sum_idx] += \
                 self.map[to_sum_idx, LAST_SEEN_COUNTER] * UNSEEN_LAND_SMELL
-        # 3. define the indexes of the emitters
+        # 3. own dead. Values are also added
+        for ant, counter in self.own_dead:
+            tant = tuple(ant)
+            existing_scent = scent_mask[tant]
+            if existing_scent == EMPTY:
+                scent_mask[tant] = 0
+            scent_mask[tuple(ant)] = OWN_DEAD_SCENT * \
+                                     float(counter) / OWN_DEAD_FADING_COUNTER
+        # 4. define the indexes of the emitters
         idx = scent_mask != EMPTY
 
         # CREATE THE BLITTING LAYERS

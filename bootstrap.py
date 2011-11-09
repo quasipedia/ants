@@ -37,10 +37,10 @@ def set_bot_profiling(bot):
             profiler.runcall(bot._do_turn, *args, **kwargs)
             profiler.dump_stats(BOT_DO_TURN_F)
             # Dumping the scent visualisation
-            w = bot.world
-            vis = visualisation.Visualiser(cols=w.cols, rows=w.rows)
-            vis.render_scent(w.map)
-            vis.save(w.turn)
+            #w = bot.world
+            #vis = visualisation.Visualiser(cols=w.cols, rows=w.rows)
+            #vis.render_scent(w.map)
+            #vis.save(w.turn)
         bot.do_turn = profiled_turn
     else:
         bot.do_turn = bot._do_turn
