@@ -2,21 +2,26 @@
 # Simple script to visualise the information about profiling the bot.
 
 import pstats
+import re
 
-from bootstrap import FULL_LOOP_F, BOT_DO_TURN_F, WORLD_UPDATE_F
+from checklocal import FULL_LOOP_OLD, BOT_DO_TURN_F, WORLD_UPDATE_F
+
+# REGEX
+RE_DIFFUSE_STEPS = r'(\d+) passes'
+RE_TURN_LENGTH= r'DURATION : (\d+) ms'
 
 # FULL LOOP LENGTH
-lines = open(FULL_LOOP_F).readlines()
-times = []
-for line in lines:
-    print(line.strip())
-    times.append(line.split().pop())
-print('\n')
-n_times = [float(t) for t in times]
-print('Turn zero length    :   %.3f' % n_times.pop(0))
-print('Average regular turn length :   %.3f' % (sum(n_times) / len(n_times)))
-print('Longest regular turn length :   %.3f' % max(n_times))
-print('\n')
+file_content = open(FULL_LOOP_OLD).read()
+diffuse_steps = re.findall(RE_DIFFUSE_STEPS, file_content)
+n_steps = [int(t) for t in diffuse_steps]
+turn_times = re.findall(RE_TURN_LENGTH, file_content)
+n_times = [int(t) for t in turn_times]
+print('Game length                    : %d turns' % len(turn_times))
+print('Turn zero length               : %d\n' % n_times.pop(0))
+print('Turn lengths (min/avg/max)     : %.d  /  %.d  /  %.d' %
+     (min(n_times), sum(n_times) / len(n_times), max(n_times)))
+print('Diffusion steps (min/avg/max)  : %.d  /  %.d  /  %.d\n' %
+     (min(n_steps), sum(n_steps) / len(n_steps), max(n_steps)))
 
 # BOT's DO_TURN LENGTH
 p = pstats.Stats(BOT_DO_TURN_F)

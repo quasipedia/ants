@@ -60,13 +60,16 @@ class Visualiser(object):
         self.ctx.set_source_rgb(0, 0, 0)
         self.ctx.paint()
 
-    def render_map(self, world_map):
+    def render_map(self, world_map, with_land=True):
         '''
         Render a world map to image.
         '''
         # Tiles to check with equality
-        for value in [world.LAND, world.WATER, world.FOOD, world.OWN_ANT,
-                      world.OWN_HILL, world.OWN_DEAD]:
+        entities_to_render = [world.WATER, world.FOOD, world.OWN_ANT,
+                              world.OWN_HILL, world.OWN_DEAD]
+        if with_land == True:
+            entities_to_render.append(world.LAND)
+        for value in entities_to_render:
             locations = zip(*np.where(world_map[:, :, 0] == value))
             for location in locations:
                 self._draw_tile(location, COLOURS[value])
@@ -96,7 +99,8 @@ class Visualiser(object):
         '''
         Display the scent distribution on the map.
         '''
-        max_scent = max([abs(e) for e in world.SCENTS.values()])
+        #max_scent = max([abs(e) for e in world.SCENTS.values()])
+        max_scent = world.SCENTS[world.FOOD]
         cols, rows = world_map.shape[:2]
         for col in range(cols):
             for row in range(rows):
@@ -107,6 +111,7 @@ class Visualiser(object):
         locations = zip(*np.where(world_map[:, :, 0] == world.OWN_ANT))
         for location in locations:
             self._draw_tile(location, COLOURS[world.OWN_ANT])
+        self.render_map(world_map, with_land=False)
 
     def save(self, frame):
         '''

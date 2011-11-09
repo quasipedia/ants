@@ -15,5 +15,4 @@ python tools/playgame.py "python MyBot.py" \
                          --verbose \
                          --log_stderr \
                          --turntime=500 \
-                         --fill
-
+                         --fill 

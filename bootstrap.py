@@ -9,11 +9,12 @@ import sys
 
 from world import World
 from MyBot import Bot
-from checklocal import RUNS_LOCALLY
+from checklocal import RUNS_LOCALLY, BOT_DO_TURN_F, WORLD_UPDATE_F
 
 if RUNS_LOCALLY:
     import visualisation
     import cProfile
+    from overlay import overlay
     from time import time
 
 __author__ = "Mac Ryan"
@@ -26,12 +27,6 @@ __email__ = "quasipedia@gmail.com"
 __status__ = "Development"
 
 
-PROFILING_DIR = 'profiling'
-FULL_LOOP_F = '%s/full_loops' % PROFILING_DIR
-BOT_DO_TURN_F = '%s/do_turn' % PROFILING_DIR
-WORLD_UPDATE_F = '%s/update_world' % PROFILING_DIR
-
-
 def set_bot_profiling(bot):
     '''
     Set the bot to be profiled.
@@ -42,10 +37,10 @@ def set_bot_profiling(bot):
             profiler.runcall(bot._do_turn, *args, **kwargs)
             profiler.dump_stats(BOT_DO_TURN_F)
             # Dumping the scent visualisation
-            #w = args[0]
-            #vis = visualisation.Visualiser(cols=w.cols, rows=w.rows)
-            #vis.render_scent(w.map)
-            #vis.save(w.turn)
+            w = bot.world
+            vis = visualisation.Visualiser(cols=w.cols, rows=w.rows)
+            vis.render_scent(w.map)
+            vis.save(w.turn)
         bot.do_turn = profiled_turn
     else:
         bot.do_turn = bot._do_turn
@@ -71,12 +66,17 @@ def run():
     engine.
     '''
     world = World()
-    set_world_profiling(world)
     bot = Bot(world)
+    # The following calls are not conditional to RUNS_LOCALLY as they do stuff
+    # either way...
+    set_world_profiling(world)
     set_bot_profiling(bot)
     if RUNS_LOCALLY:
         import logging
         log = logging.getLogger('main')
+        # the overlay works like the logging: the overlay.overlay object is
+        # the Overlay() intantiation
+        overlay.target_bot(bot)
     data = []
     while(True):
         try:
@@ -103,3 +103,6 @@ def run():
             import traceback
             traceback.print_exc(file=sys.stderr)
             sys.stderr.flush()
+        finally:
+            if RUNS_LOCALLY:
+                logging.shutdown()

@@ -18,7 +18,7 @@ cd tools
               --turns 1000 \
               --map_file maps/maze/maze_02p_02.map \
               --log_stderr \
-              --turntime=500 \
+              --turntime=1000 \
               --fill |
 java -jar visualizer.jar
 cd ..
