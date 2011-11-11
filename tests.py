@@ -152,7 +152,10 @@ class TestAnts(unittest.TestCase):
                          (self.world.map[:, :, 0] < world.OWN_ANT))
         self.assertTrue((expected == found), msg='ENEMY DEAD')
 
-    def test_is_visible(self):
+    def test_is_tile_visible(self):
+        self.assertTrue(False)
+
+    def test_get_friendfoes(self):
         self.assertTrue(False)
 
     def test_diffuse(self):

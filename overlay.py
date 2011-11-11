@@ -33,13 +33,26 @@ class Overlay(object):
 
     def show_own_dead(self):
         '''
-        Own dead ants: white empty circle
+        Own dead ants as they are remembered by the bot.
         '''
         dead = self.world.own_dead
+        sys.stdout.write('v setLineWidth 3\n')
+        sys.stdout.write('v setLineColor 0 0 0 1\n')   #black
         for (col, row), counter in dead:
+            sys.stdout.write('v circle %d %d 1.2 false\n' % (row, col))
+
+    def show_attackers(self):
+        '''
+        Own attackers during current turn.
+        '''
+        bot = self.bot
+        sys.stdout.write('v setLineWidth 3\n')
+        sys.stdout.write('v setLineColor 255 0 0 1\n')   #red
+        for (col, row) in bot.last_turn_data['attackers']:
             sys.stdout.write('v circle %d %d 1.2 false\n' % (row, col))
 
     def show_all(self):
         self.show_own_dead()
+        self.show_attackers()
 
 overlay = Overlay()

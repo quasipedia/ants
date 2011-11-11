@@ -11,7 +11,7 @@ python tools/playgame.py "python MyBot.py" \
                          "python ${OPPONENT}" \
                          --map_file tools/maps/maze/maze_02p_01.map \
                          --log_dir game_logs \
-                         --turns 1000 \
+                         --turns 200 \
                          --verbose \
                          --log_stderr \
                          --turntime=500 \

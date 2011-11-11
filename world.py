@@ -126,11 +126,10 @@ class World():
         self.attackradiusint = int(self.attackradius2**0.5)
         self.spawnradiusint = int(self.spawnradius2**0.5)
         self.viewradiusint = int(self.viewradius2**0.5)
-        # Generate the field-of-view mask
-        mx = self.viewradiusint  # for speed in following loop
-        self.view_mask = self._get_circular_mask(mx)
-        # Generate the diffusion range for enemy hills.
-        self.enemy_hill_diffusion_mask = self._get_circular_mask(2 * mx)
+        # Generate the field-of-view and attack-range masks
+        self.view_mask = self._get_circular_mask(self.viewradiusint)
+        self.attack_mask = self._get_circular_mask(2 * self.attackradiusint)
+        self.movement_mask = self._get_circular_mask(1)
         # Initialise hills and own_dead list/sets. This happens here as they
         # are not reset at each update.
         self.own_hills = set([])
@@ -221,7 +220,7 @@ class World():
             # use a copy of the set to prevent modifying it's size during
             # iteration.
             for loc in set_.copy():
-                if self.is_visible(loc) and loc not in list_:
+                if self.is_tile_visible(loc) and loc not in list_:
                     set_.remove(loc)
             # add the new ones
             for loc in list_:
@@ -320,11 +319,30 @@ class World():
             log.info('DIFFUSE : %d passes - %d more needed' %
                 (counter, max_diffusion_steps - counter))
 
-    def is_visible(self, loc):
+    def is_tile_visible(self, loc):
         '''
         Return True if the location is currently visible.
         '''
         return 0 == self.map[loc[0], loc[1], LAST_SEEN_COUNTER]
+
+    def get_friendfoes(self, ant):
+        '''
+        Return a tuple (friends, foes) with the ants visible by `ant`.
+        '''
+        m = self.map
+        friends = []
+        foes = []
+        visible_idx = [(axis + ant[i]) % self.world_size[i] for i, axis in \
+                       enumerate(self.view_mask)]
+        # For the following lines see: http://goo.gl/zY6VD
+        where_own = where(m[..., 0][visible_idx] == OWN_ANT)[0]
+        where_enemy = where(m[..., 0][visible_idx] > OWN_ANT)[0]
+        transposed_cross = array(visible_idx).T
+        own = transposed_cross[where_own]
+        other = transposed_cross[where_enemy]
+        if m[ant[0], ant[1], ENTITY_ID] == OWN_ANT:
+            return own, other
+        return other, own
 
     def issue_order(self, order):
         '''
@@ -390,12 +408,13 @@ class World():
         are within view or attack radii from an ant, or similar.
         '''
         side = radius * 2 + 1
+        radius2 = radius ** 2
         tmp = zeros((side, side), dtype=bool)
         for d_row in range(-radius, radius+1):
             for d_col in range(-radius, radius+1):
-                if d_row**2 + d_col**2 <= self.viewradius2:
+                if d_row**2 + d_col**2 <= radius2:
                     tmp[radius+d_col][radius+d_row] = True
         # At this point `tmp` contains a representation of the field of view,
         # what we want is coordinate offsets from the ant position
         tmp = where(tmp)
-        self.view_mask = tuple([value - radius for value in tmp])
+        return tuple([value - radius for value in tmp])

@@ -10,6 +10,8 @@ to the game API.
 
 from random import shuffle, choice
 
+from numpy import any as np_any
+
 import bootstrap
 from world import LAND, ENTITY_ID, OWN_HILL
 
@@ -37,6 +39,7 @@ class Bot(object):
 
     def __init__(self, world):
         self.world = world
+        self.data_to_keep = {}
 
     def do_setup(self):
         '''
@@ -52,6 +55,34 @@ class Bot(object):
         The game engine will actually invoke ``do_turn()`` rather than
         ``_do_turn()``, but the ``main()`` might wrap the turn into a profiler
         when played locally, hence this intermediate step.
+        '''
+        self.attack()
+        self.move()
+        self._save_data()
+
+    def attack(self):
+        '''
+        Manage attacking ants.
+        '''
+        frfoe = self.world.get_friendfoes
+        attackers = []
+        for enemy in self.world.enemy_ants:
+            friends, foes = frfoe(enemy)
+            if np_any(foes):
+                attackers.append(foes[0])  #the list is contained in 2D array
+        len1 = len(attackers)
+        attackers = [ant for ant in attackers if np_any(ant)]
+        len2 = len(attackers)
+        if RUNS_LOCALLY and len1 != len2:
+            log.debug('In turn %d found %s ghost ants' % (self.world.turn,
+                                                          len2 - len1))
+        self.data_to_keep['attackers'] = attackers
+        log.debug(attackers)
+
+    def move(self):
+        '''
+        Move all the ants that haven't been assigned to any specific and
+        alternative task.
         '''
         world = self.world
         destinations = []
@@ -71,6 +102,13 @@ class Bot(object):
                 destinations.append(tuple(ant))
         if RUNS_LOCALLY:
             log.info('AI : done.')
+
+    def _save_data(self):
+        '''
+        Save across-turns data.
+        '''
+        self.last_turn_data = self.data_to_keep
+
 
 
 if __name__ == '__main__':
