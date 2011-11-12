@@ -19,6 +19,7 @@ cd tools
               --map_file maps/random_walk/random_walk_02p_02.map \
               --log_stderr \
               --turntime=500 \
+              -R \
               --fill |
 java -jar visualizer.jar
 cd ..

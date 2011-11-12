@@ -7,3 +7,4 @@ tests.py export-ignore
 do_profile export-ignore
 visualisation.py export-ignore
 tcpclient.py export-ignore
+overlay.py export-ignore

@@ -2,24 +2,24 @@
 # -*- coding: utf-8  -*-
 
 '''
-Contest entry for the Fall 2011 challenge on http://aichallenge.org
-
-This file is needed by the online game engine, and it exposes the main bot
-to the game API.
+This module contains:
+- The main control loop
+- A few helper functions used to establish if the bot code is being run
+  locally (in which case profiling and logging are activated) or on the game
+  server
 '''
 
-from random import shuffle, choice
+import sys
 
-from numpy import any as np_any
+from world import World
+from ai import Bot
+from checklocal import RUNS_LOCALLY, BOT_DO_TURN_F, WORLD_UPDATE_F
 
-import bootstrap
-from world import LAND, ENTITY_ID, OWN_HILL
-
-from checklocal import RUNS_LOCALLY
 if RUNS_LOCALLY:
+    import visualisation
+    import cProfile
     from overlay import overlay
-    import logging
-    log = logging.getLogger('main')
+    from time import time
 
 __author__ = "Mac Ryan"
 __copyright__ = "Copyright 2011, Mac Ryan"
@@ -31,86 +31,85 @@ __email__ = "quasipedia@gmail.com"
 __status__ = "Development"
 
 
-class Bot(object):
-
+def set_bot_profiling(bot):
     '''
-    The bot's AI.
+    Set the bot to be profiled.
     '''
-
-    def __init__(self, world):
-        self.world = world
-        self.data_to_keep = {}
-
-    def do_setup(self):
-        '''
-        This funcion is called only once, after the intial settings are
-        received and parsed from the game engine, but before the match
-        starts. '''
-        world = self.world
-
-    def _do_turn(self):
-        '''
-        This is the raw function invoked by the game engine at each turn.
-
-        The game engine will actually invoke ``do_turn()`` rather than
-        ``_do_turn()``, but the ``main()`` might wrap the turn into a profiler
-        when played locally, hence this intermediate step.
-        '''
-        self.attack()
-        self.move()
-        self._save_data()
-
-    def attack(self):
-        '''
-        Manage attacking ants.
-        '''
-        frfoe = self.world.get_friendfoes
-        attackers = []
-        for enemy in self.world.enemy_ants:
-            friends, foes = frfoe(enemy)
-            if np_any(foes):
-                attackers.append(foes[0])  #the list is contained in 2D array
-        len1 = len(attackers)
-        attackers = [ant for ant in attackers if np_any(ant)]
-        len2 = len(attackers)
-        if RUNS_LOCALLY and len1 != len2:
-            log.debug('In turn %d found %s ghost ants' % (self.world.turn,
-                                                          len2 - len1))
-        self.data_to_keep['attackers'] = attackers
-        log.debug(attackers)
-
-    def move(self):
-        '''
-        Move all the ants that haven't been assigned to any specific and
-        alternative task.
-        '''
-        world = self.world
-        destinations = []
-        for ant in world.own_ants:
-            will_move = False
-            scents_by_strength = world.get_scent_strengths(ant)
-            for scent, dest, direction in scents_by_strength:
-                dest = tuple(dest)
-                if not dest in destinations \
-                   and (world.map[dest][ENTITY_ID] == LAND or
-                        world.map[dest][ENTITY_ID] < OWN_HILL):
-                    world.issue_order((ant, direction))
-                    destinations.append(dest)
-                    will_move = True
-                    break
-            if not will_move:
-                destinations.append(tuple(ant))
-        if RUNS_LOCALLY:
-            log.info('AI : done.')
-
-    def _save_data(self):
-        '''
-        Save across-turns data.
-        '''
-        self.last_turn_data = self.data_to_keep
+    if RUNS_LOCALLY:
+        profiler = cProfile.Profile()
+        vis = visualisation.Visualiser()
+        def profiled_turn(*args, **kwargs):
+            profiler.runcall(bot._do_turn, *args, **kwargs)
+            profiler.dump_stats(BOT_DO_TURN_F)
+            # Dumping the visualisation
+            #vis.dump(bot.world)
+        bot.do_turn = profiled_turn
+    else:
+        bot.do_turn = bot._do_turn
 
 
+def set_world_profiling(world):
+    '''
+    Set the world to be profiled.
+    '''
+    if RUNS_LOCALLY:
+        profiler = cProfile.Profile()
+        def profiled_update(*args, **kwargs):
+            profiler.runcall(world._update, *args, **kwargs)
+            profiler.dump_stats(WORLD_UPDATE_F)
+        world.update = profiled_update
+    else:
+        world.update = world._update
+
+
+def run():
+    '''
+    The main program loop. Manage the interface between the bot and the game
+    engine.
+    '''
+    world = World()
+    bot = Bot(world)
+    # The following 2 calls are not conditional to RUNS_LOCALLY as they do
+    # stuff either way...
+    set_world_profiling(world)
+    set_bot_profiling(bot)
+    if RUNS_LOCALLY:
+        import logging
+        log = logging.getLogger('main')
+        log.debug('# LOGGER STARTED')
+        # the overlay works like the logging: the overlay.overlay object is
+        # the Overlay() intantiation
+        overlay.target_bot(bot)
+    data = []
+    while(True):
+        try:
+            current_line = sys.stdin.readline().strip().lower()
+            if not current_line:
+                continue  #skip empty lines
+            if current_line == 'ready':
+                world.setup(data)
+                bot.do_setup()
+                world.finish_turn()
+                data = []
+            elif current_line == 'go':
+                world.update(data)
+                bot.do_turn()
+                world.finish_turn()
+                data = []
+            else:
+                data.append(current_line)
+        except EOFError as e:  # game is over or game engine has crashed
+            print(e)
+            break
+        except KeyboardInterrupt:  # local user is stopping the game
+            print('\nEXECUTION STOPPED BY USER\n')
+        except:  # try to stay alive! [don't raise or exit]
+            import traceback
+            traceback.print_exc(file=sys.stderr)
+            sys.stderr.flush()
+        finally:
+            if RUNS_LOCALLY:
+                logging.shutdown()
 
 if __name__ == '__main__':
-
-    bootstrap.run()
+    run()

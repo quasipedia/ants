@@ -10,4 +10,4 @@ profiling/*
 *.py3c
 *.geany
 bot.zip
-
+do_profile*
