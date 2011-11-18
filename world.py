@@ -74,6 +74,7 @@ __status__ = "Development"
 FADING_OWN_DEAD = 1.0 / 10
 FADING_ENEMY_DEAD = 1.0 / 1
 FADING_UNSEEN_FOOD = 1.0 / 10
+UNSEEN_LAND_STEP = 1
 
 # SCENT MASK INDEXES
 MASK_H_EXPLORE = 0
@@ -175,9 +176,8 @@ class World():
         self.spawnradiusint = int(self.spawnradius2**0.5)
         self.viewradiusint = int(self.viewradius2**0.5)
         # Generate the field-of-view and attack-range masks
-        self.view_mask = get_circular_mask(self.viewradiusint)
-        self.attack_mask = get_circular_mask(self.attackradiusint)
-        self.battle_mask = get_circular_mask(self.battleradiusint)
+        self.view_mask = get_circular_mask(self.viewradius2)
+        self.attack_mask = get_circular_mask(self.attackradius2)
         self.movement_mask = get_circular_mask(1)
         # Initialise dictionaries for those temporary but non-moveable entities
         # whose visibility may change.
@@ -390,7 +390,7 @@ class World():
         Increment the `last view counter` for all the map, then use view_mask
         to reset it where land is visible.
         '''
-        self.map[..., UNSEEN_COUNTER] += 1
+        self.map[..., UNSEEN_COUNTER] += UNSEEN_LAND_STEP
         for loc in self.own_ants:
             self.map[:, :, UNSEEN_COUNTER][[(axis + loc[i]) % \
                     self.world_size[i] for i, axis in \
