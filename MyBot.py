@@ -42,7 +42,7 @@ def set_bot_profiling(bot):
             profiler.runcall(bot._do_turn, *args, **kwargs)
             profiler.dump_stats(BOT_DO_TURN_F)
             # Dumping the visualisation
-            #vis.dump(bot.world)
+            vis.dump(bot.world)
         bot.do_turn = profiled_turn
     else:
         bot.do_turn = bot._do_turn

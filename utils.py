@@ -26,7 +26,9 @@ __all__ = ['fastroll', 'get_circular_mask', 'get_circular_mask_tmc']
 def fastroll(array, dist, axis):
     '''
     Numpy's np.roll is implemented extremely inefficiently. This is a 2-10x
-    faster replacement! Kudos to tmc from the forums!
+    faster replacement! Kudos to tmc from the forums, although banchmarking
+    shows this implementation is ~15% slower than regualar roll for the use
+    I do of it in the diffusion routine...
     '''
     prefix = [slice(None)] * axis
     dist %= array.shape[axis]

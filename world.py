@@ -45,7 +45,7 @@ import sys
 from time import time
 
 from numpy import array, zeros, ones, int8, minimum, where, roll, \
-                  logical_and, nonzero, isnan
+                  logical_and, nonzero, isnan, logical_or
 from numpy import abs as np_abs
 from numpy import nan as np_nan
 from numpy import sum as np_sum
@@ -74,7 +74,9 @@ __status__ = "Development"
 FADING_OWN_DEAD = 1.0 / 10
 FADING_ENEMY_DEAD = 1.0 / 1
 FADING_UNSEEN_FOOD = 1.0 / 10
-UNSEEN_LAND_STEP = 1
+
+# UNSEEN LAND
+UNSEEN_LAND_STEP = 4**2
 
 # SCENT MASK INDEXES
 MASK_H_EXPLORE = 0
@@ -254,7 +256,10 @@ class World():
                 dest += roll(source, amount, axis=axis)
             dest *= 0.25
             # blit the emitters map
-            dest[idx] = scent_mask[idx]
+            dest[idx] += scent_mask[idx]
+            # remove scent where blocked
+            condition = where(scent_mask == 0)
+            dest[condition] = 0
         # transfer back to world map
         self.map[:, :, H_EXPLORE:] = dest
         if RUNS_LOCALLY:
@@ -472,7 +477,7 @@ class World():
         '''
         # EVALUATE WHEN TO STOP
         if abs_left == perc_left == None:
-            perc_left = 0.25 if RUNS_LOCALLY else 0.15  #gives time to profile
+            perc_left = 0.5 if RUNS_LOCALLY else 0.15  #gives time to profile
         if abs_left is None:
             abs_left = self.turntime * perc_left
         hard_time_limit = self.turn_start_time + \
