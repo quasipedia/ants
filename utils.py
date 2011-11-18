@@ -20,7 +20,7 @@ __license__ = "GPL v3"
 __maintainer__ = "Mac Ryan"
 __email__ = "quasipedia@gmail.com"
 __status__ = "Development"
-__all__ = ['fastroll', 'get_circular_mask', 'get_circular_mask_bis']
+__all__ = ['fastroll', 'get_circular_mask', 'get_circular_mask_tmc']
 
 
 def fastroll(array, dist, axis):
@@ -56,7 +56,7 @@ def get_circular_mask(radius2):
     tmp = where(tmp)
     return tuple([value - radius for value in tmp])
 
-def get_circular_mask_bis(radius2):
+def get_circular_mask_tmc(radius2):
     radius = int(radius2 ** 0.5)
     diameter = radius * 2 + 1
     disc = zeros((diameter, diameter), dtype = np_bool)

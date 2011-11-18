@@ -189,7 +189,7 @@ class World():
 
         if RUNS_LOCALLY:
             log.info('####### NEW GAME! ########')
-            log.info('STARTUP DATA : %s' % data)
+            log.info('####### STARTUP DATA : %s' % data)
 
     def _update(self, data):
         '''
