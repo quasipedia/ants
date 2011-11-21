@@ -31,18 +31,18 @@ class Overlay(object):
         self.bot = bot
         self.world = bot.world
 
-    def show_harvesters(self):
+    def show_battlegroups(self, own, enemies):
         '''
         Own attackers during current turn.
         '''
-        return
-        bot = self.bot
         sys.stdout.write('v setLineWidth 3\n')
-        sys.stdout.write('v setLineColor 255 0 0 1\n')   #red
-        for (col, row) in self.wor:
+        # OWN
+        sys.stdout.write('v setLineColor 255 0 0 1.0\n')   #red
+        for (col, row) in own:
             sys.stdout.write('v circle %d %d 1.2 false\n' % (row, col))
-
-    def show_all(self):
-        self.show_harvesters()
+        # ENEMIES
+        sys.stdout.write('v setLineColor 0 255 0 1.0\n')   #green
+        for (col, row) in enemies:
+            sys.stdout.write('v circle %d %d 1.2 false\n' % (row, col))
 
 overlay = Overlay()

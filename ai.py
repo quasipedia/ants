@@ -112,6 +112,9 @@ class Bot(object):
                                 own_moves[own][odest, odir] = [edest]
             if RUNS_LOCALLY:
                 log.debug('# OWN MOVES FOR ENEMY %s : %s' % (enemy, own_moves))
+        if RUNS_LOCALLY:
+            overlay.show_battlegroups(own_engageable, enemy_engageable)
+
 
         # - Wait for 2 own engageable by 1 enemy, else goback.
         # - Try to find which moves of each own ants would result in the same

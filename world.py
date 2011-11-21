@@ -334,8 +334,6 @@ class World():
         if RUNS_LOCALLY:
             duration = int((time() - self.turn_start_time) * 1000)
             log.info('TURN DURATION : %d ms' % duration)
-            if self.turn > 0:
-                overlay.show_all()
         sys.stdout.write('go\n')
         sys.stdout.flush()
 
