@@ -8,7 +8,7 @@ This file contains general-iterest utilities, mostly linked to numpy.
 '''
 
 
-from numpy import array, empty_like, zeros, where, ndindex
+from numpy import array, empty_like, zeros, where, ndindex, roll, logical_xor
 from numpy import bool as np_bool
 
 
@@ -20,7 +20,8 @@ __license__ = "GPL v3"
 __maintainer__ = "Mac Ryan"
 __email__ = "quasipedia@gmail.com"
 __status__ = "Development"
-__all__ = ['fastroll', 'get_circular_mask', 'get_circular_mask_tmc']
+__all__ = ['fastroll', 'get_circular_mask', 'get_circular_mask_tmc',
+           'get_attack_plus_two']
 
 
 def fastroll(array, dist, axis):
@@ -59,6 +60,9 @@ def get_circular_mask(radius2):
     return tuple([value - radius for value in tmp])
 
 def get_circular_mask_tmc(radius2):
+    '''
+    tmc' implementation of `get_circular_mask`.
+    '''
     radius = int(radius2 ** 0.5)
     diameter = radius * 2 + 1
     disc = zeros((diameter, diameter), dtype = np_bool)
@@ -67,3 +71,29 @@ def get_circular_mask_tmc(radius2):
             disc[y, x] = True
     tmp = where(disc)
     return tuple([value - radius for value in tmp])
+
+def get_attack_plus_two(radius2):
+    '''
+    Get a mask correspeonding to all those points that would bring a target
+    within attack radius in two moves [used to isolate ants that could get into
+    a fight in the following turn].
+    '''
+    radius = int(radius2 ** 0.5) + 2  # "2" as in "two movements"
+    diameter = radius * 2 + 1
+    disc = zeros((diameter, diameter), dtype = np_bool)
+    # get the regualar circular mask
+    for y, x in ndindex(*disc.shape):
+        if (radius - y) ** 2 + (radius - x) ** 2 <= radius2:
+            disc[y, x] = True
+    original = disc.copy()
+    # simulate movements
+    for i in (0, 1):
+        disc = roll(disc, 1, 0) | roll(disc, -1, 0) | \
+               roll(disc, 1, 1) | roll(disc, -1, 1)
+    # remove the central mask (nothing can be there as it would have been
+    # destroyed.
+    disc = logical_xor(disc, original)
+    tmp = where(disc)
+    return tuple([value - radius for value in tmp])
+
+

@@ -174,12 +174,12 @@ class World():
         self.map = zeros((self.cols, self.rows, 12), dtype=float)
         # Compute radii
         self.attackradiusint = int(self.attackradius2**0.5)
-        self.battleradiusint = int(self.attackradius2**0.5 + 2)
         self.spawnradiusint = int(self.spawnradius2**0.5)
         self.viewradiusint = int(self.viewradius2**0.5)
         # Generate the field-of-view and attack-range masks
         self.view_mask = get_circular_mask(self.viewradius2)
         self.attack_mask = get_circular_mask(self.attackradius2)
+        self.engage_mask = get_attack_plus_two(self.attackradius2)
         self.movement_mask = get_circular_mask(1)
         # Initialise dictionaries for those temporary but non-moveable entities
         # whose visibility may change.
@@ -285,17 +285,39 @@ class World():
         visible from location `loc`
         '''
         m = self.map
-        visible_idx = [(axis + loc[i]) % self.world_size[i] for i, axis in \
-                       enumerate(self.view_mask)]
+        wsize = self.world_size
+        mask = self.view_mask
+        idx = [(axis + loc[i]) % wsize[i] for i, axis in enumerate(mask)]
         # For the following lines see: http://goo.gl/zY6VD
-        transposed = array(visible_idx).T
-        return transposed[where(m[visible_idx][..., layer])[0]]
+        transposed = array(idx).T
+        return transposed[where(m[idx][..., layer])[0]]
 
-    def get_engageable(self, ant):
+    def get_engageable(self, loc):
         '''
-        Returns a list of enemy ants that might be engaged the following turn
-        (battle radius = attack radius + 2).
+        Returns a list of own ants that might be engaged in a battle the
+        following turn (battle mask = attack radius + 2) with an enemy ant
+        located at `loc`.
         '''
+        m = self.map
+        wsize = self.world_size
+        mask = self.engage_mask
+        idx = [(axis + loc[i]) % wsize[i] for i, axis in enumerate(mask)]
+        # For the following lines see: http://goo.gl/zY6VD
+        transposed = array(idx).T
+        return transposed[where(m[idx][..., OWN_ANTS])[0]]
+
+    def get_in_attackradius(self, loc):
+        '''
+        Returns a list of enemy ants that are within attack radius from
+        location `loc`.
+        '''
+        m = self.map
+        wsize = self.world_size
+        mask = self.attack_mask
+        idx = [(axis + loc[i]) % wsize[i] for i, axis in enumerate(mask)]
+        # For the following lines see: http://goo.gl/zY6VD
+        transposed = array(idx).T
+        return transposed[where(m[idx][..., ENEMY_ANTS])[0]]
 
     def issue_order(self, order):
         '''
@@ -354,6 +376,19 @@ class World():
             result.append([scent, destination, direction])
         return sorted(result, reverse=True)
 
+    def get_legal_moves(self, loc):
+        '''
+        Return a list of legal moves for an ant located at `loc`.
+        Legal move is defined as a move on land, regardless of what is there.
+        '''
+        result = [[loc, 0]]
+        map_ = self.map
+        for direction, offset in DIRECTIONS.items():
+            destination = tuple((loc + offset) % self.world_size)
+            if nonzero(map_[destination, WATER]):
+                result.append([destination, direction])
+        return result
+
     def _parse_input_lines(self, data):
         '''
         Parse the data received by the game engine.
@@ -395,11 +430,13 @@ class World():
         Increment the `last view counter` for all the map, then use view_mask
         to reset it where land is visible.
         '''
-        self.map[..., UNSEEN_COUNTER] += UNSEEN_LAND_STEP
+        map_ = self.map
+        mask = self.view_mask
+        map_[..., UNSEEN_COUNTER] += UNSEEN_LAND_STEP
         for loc in self.own_ants:
-            self.map[:, :, UNSEEN_COUNTER][[(axis + loc[i]) % \
+            map_[:, :, UNSEEN_COUNTER][[(axis + loc[i]) % \
                     self.world_size[i] for i, axis in \
-                    enumerate(self.view_mask)]] = 0
+                    enumerate(mask)]] = 0
 
     def _update_hills(self):
         '''

@@ -11,6 +11,7 @@ to the game API.
 from random import shuffle, choice
 
 from numpy import any as np_any
+from numpy import array
 
 from world import WATER, OWN_HILLS, H_EXPLORE, H_HARVEST, H_FIGHT, EXPLORER, \
                   HARVESTER, ATTACKER, OWN_ANTS
@@ -39,14 +40,12 @@ class Bot(object):
 
     def __init__(self, world):
         self.world = world
-        self.data_to_keep = {}
 
     def do_setup(self):
         '''
         This funcion is called only once, after the intial settings are
         received and parsed from the game engine, but before the match
         starts. '''
-        world = self.world
         self.need_for_food = True
 
     def _do_turn(self):
@@ -67,29 +66,56 @@ class Bot(object):
         if self.need_for_food == True:
             self.harvest()
         self.explore()
-        self._save_data()
 
     def attack(self):
         '''
         Manage attacking ants.
         '''
-        # Define weighted map of attack areas
+        world = self.world
+        # Isolate enemies and own ants which are at attackradius + 2.
+        enemy_engageable = {}
+        own_engageable = {}
+        f = self.world.get_engageable
+        for enemy in world.enemy_ants:
+            tmp = f(enemy)
+            if np_any(tmp):
+                tmp = set([tuple(loc) for loc in tmp])
+                enemy_engageable[enemy] = tmp
+                for own in tmp:
+                    try:
+                        own_engageable[own].add(enemy)
+                    except KeyError:
+                        own_engageable[own] = set(enemy)
+        if RUNS_LOCALLY:
+            log.debug('# OWN ENGAGEABLE : %s' % own_engageable)
+            log.debug('# ENEMY ENGAGEABLE : %s' % enemy_engageable)
 
-        # Identify attackrange + 1 (A1) or attackrange + 2 (A2) tiles
+        # BASIC, INTIAL STRATEGY (PROBABLY ONLY GOOD FOR ISOLATED ENEMIES)
+        # Notably, it does not consider clusters of enemy ants, pretending
+        # enemy ants are always isolated.
 
-        # Deteach from the main scent mechanism all those ants that are on
-        # either A1 or A2 tiles
+        attack_mask = world.attack_mask
+        get_legal_moves = world.get_legal_moves
+        for enemy, engageable in enemy_engageable.items():
+            enemy_moves = get_legal_moves(enemy)
+            own_moves = {}
+            for own in engageable:
+                own_moves[own] = {}
+                # Here's the key-passage: find out how each move would score
+                # relative to the opponent's one.
+                for odest, odir in get_legal_moves(own):
+                    for edest, edir in enemy_moves:
+                        if odest in world.get_in_attackradius(edest):
+                            try:
+                                own_moves[own][odest, odir].append(edest)
+                            except KeyError:
+                                own_moves[own][odest, odir] = [edest]
+            if RUNS_LOCALLY:
+                log.debug('# OWN MOVES FOR ENEMY %s : %s' % (enemy, own_moves))
 
-        # Do best offensive move for A1 (forward|stay) or suspend judgment
-
-        # Do best offensive move for A2 (forward|stay)
-
-        # If A1 was suspended and A2 moved forward, re-evaluate after A2 move.
-
-        # Else: retreat.
-
-        attackers = []
-        self.data_to_keep['attackers'] = attackers
+        # - Wait for 2 own engageable by 1 enemy, else goback.
+        # - Try to find which moves of each own ants would result in the same
+        #   (enemy, movement) tuples.
 
     def harvest(self):
         '''
@@ -138,8 +164,11 @@ class Bot(object):
             else:  #executes only if a break is never called
                 destinations.add(ant)
 
-    def _save_data(self):
+    def _get_fighters(self):
         '''
-        Save across-turns data.
+        Find all those ants that are close enought to an enemy to engage during
+        the following turn.
         '''
-        self.last_turn_data = self.data_to_keep
+        # Identify attackrange + 1 (A1) or attackrange + 2 (A2) tiles
+        # Deteach from the main scent mechanism all those ants that are on
+        # either A1 or A2 tiles

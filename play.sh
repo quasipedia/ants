@@ -14,5 +14,5 @@ python tools/playgame.py "python MyBot.py" \
                          --turns 1000 \
                          --verbose \
                          --log_stderr \
-                         --turntime=2000 \
+                         --turntime=500 \
                          --fill 
