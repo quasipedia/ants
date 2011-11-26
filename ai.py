@@ -97,8 +97,8 @@ class Bot(object):
         attack_mask = world.attack_mask
         get_legal_moves = world.get_legal_moves
         for enemy, engageable in enemy_engageable.items():
-            enemy_moves = get_legal_moves(enemy)
             own_moves = {}
+            enemy_moves = get_legal_moves(enemy)
             for own in engageable:
                 own_moves[own] = {}
                 # Here's the key-passage: find out how each move would score
@@ -107,13 +107,15 @@ class Bot(object):
                     for edest, edir in enemy_moves:
                         if odest in world.get_in_attackradius(edest):
                             try:
-                                own_moves[own][odest, odir].append(edest)
+                                own_moves[own][odest, odir].append((edest,
+                                                                    edir))
                             except KeyError:
-                                own_moves[own][odest, odir] = [edest]
+                                own_moves[own][odest, odir] = [(edest, edir)]
             if RUNS_LOCALLY:
                 log.debug('# OWN MOVES FOR ENEMY %s : %s' % (enemy, own_moves))
-        if RUNS_LOCALLY:
-            overlay.show_battlegroups(own_engageable, enemy_engageable)
+                overlay.show_dangers(own_moves)
+        #if RUNS_LOCALLY:
+            #overlay.show_battlegroups(own_engageable, enemy_engageable)
 
 
         # - Wait for 2 own engageable by 1 enemy, else goback.

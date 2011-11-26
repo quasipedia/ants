@@ -19,6 +19,12 @@ __email__ = "quasipedia@gmail.com"
 __status__ = "Development"
 
 
+SUBTILES_INDEX = {'n': 'TM',
+                  'e': 'MR',
+                  's': 'BM',
+                  'w': 'ML',
+                  0  : 'MM' }
+
 class Overlay(object):
 
     '''
@@ -33,7 +39,7 @@ class Overlay(object):
 
     def show_battlegroups(self, own, enemies):
         '''
-        Own attackers during current turn.
+        Own and enemies who could get into a fight the next turn.
         '''
         sys.stdout.write('v setLineWidth 3\n')
         # OWN
@@ -44,5 +50,18 @@ class Overlay(object):
         sys.stdout.write('v setLineColor 0 255 0 1.0\n')   #green
         for (col, row) in enemies:
             sys.stdout.write('v circle %d %d 1.2 false\n' % (row, col))
+
+    def show_dangers(self, data):
+        '''
+        Map of "dangers" in moving a certain way (for engageable ants only)
+        '''
+        sys.stdout.write('v setLineWidth 1\n')
+        sys.stdout.write('v setLineColor 255 0 0 1.0\n')   #red
+        for enemy, moves in data.items():
+            for ((col, row), odir), dangers in moves.items():
+                for edest, edir in dangers:
+                    subtile = SUBTILES_INDEX[edir]
+                    sys.stdout.write('v tileSubTile %s %s %s\n' %
+                                     (row, col, subtile))
 
 overlay = Overlay()

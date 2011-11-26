@@ -377,14 +377,16 @@ class World():
     def get_legal_moves(self, loc):
         '''
         Return a list of legal moves for an ant located at `loc`.
-        Legal move is defined as a move on land, regardless of what is there.
+        Legal move is defined as a move whose target destination is not a tile
+        with an unmoveable obstacle (water or food). In other terms: a legal
+        move include moves generating collisions with other ants.
         '''
         result = [[loc, 0]]
         map_ = self.map
         for direction, offset in DIRECTIONS.items():
-            destination = tuple((loc + offset) % self.world_size)
-            if nonzero(map_[destination, WATER]):
-                result.append([destination, direction])
+            x, y = (loc + offset) % self.world_size
+            if not (map_[x, y, WATER] or map_[x, y, FOOD]):
+                result.append([(x, y), direction])
         return result
 
     def _parse_input_lines(self, data):

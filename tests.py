@@ -115,65 +115,74 @@ class TestAnts(unittest.TestCase):
         self.world._update(data)
         # food
         expected = (np.array([5]), np.array([6]))
-        found = np.where(self.world.map[:, :, 0] == world.FOOD)
+        found = np.where(self.world.map[:, :, world.FOOD])
         self.assertTrue((expected == found), msg='FOOD')
         # water
         expected = (np.array([6]), np.array([7]))
-        found = np.where(self.world.map[:, :, 0] == world.WATER)
+        found = np.where(self.world.map[:, :, world.WATER])
         self.assertTrue((expected == found), msg='WATER')
         # own_ants
         expected = (np.array([8, 9]), np.array([10, 10]))
-        found = np.where(self.world.map[:, :, 0] == world.OWN_ANT)
+        found = np.where(self.world.map[:, :, world.OWN_ANTS])
         self.assertTrue((expected[0] == found[0]).all() and
                         (expected[1] == found[1]).all(), msg='OWN ANTS')
-        # regression bug - "not a player's ant" error
-        set1 = set(zip(*[tuple(el) for el in expected]))
-        set2 = set([tuple(el) for el in self.world.own_ants])
-        self.assertEqual(set1, set2)
+        e = world.EXPLORER
+        self.assertEqual({(8, 10): e, (9, 10): e}, self.world.own_ants)
         # enemy_ants
         expected = (np.array([9]), np.array([7]))
-        found = np.where(self.world.map[:, :, 0] > world.OWN_ANT)
-        self.assertTrue((expected == found), msg='ENEMY ANTS')
+        found = np.where(self.world.map[:, :, world.ENEMY_ANTS])
+        self.assertTrue((expected[0] == found[0]).all() and
+                        (expected[1] == found[1]).all(), msg='ENEMY ANTS %s')
+        self.assertEqual({(9, 7): 1}, self.world.enemy_ants)
         # own_hills
         expected = (np.array([5]), np.array([10]))
-        found = np.where(self.world.map[:, :, 0] == world.OWN_HILL)
+        found = np.where(self.world.map[:, :, world.OWN_HILLS])
         self.assertTrue((expected == found), msg='OWN HILLS')
+        self.assertEqual({(5, 10): world.PREVIOUSLY_SEEN},
+                         self.world.own_hills)
         # enemy_hills
         expected = (np.array([12]), np.array([7]))
-        found = np.where(self.world.map[:, :, 0] < world.OWN_HILL)
+        found = np.where(self.world.map[:, :, world.ENEMY_HILLS])
         self.assertTrue((expected == found), msg='ENEMY HILLS')
+        self.assertEqual({(12, 7): [world.PREVIOUSLY_SEEN, 1]},
+                         self.world.enemy_hills)
         # own_dead
         expected = (np.array([10]), np.array([10]))
-        found = np.where(self.world.map[:, :, 0] == world.OWN_DEAD)
+        found = np.where(self.world.map[:, :, world.OWN_DEAD])
         self.assertTrue((expected == found), msg='OWN DEAD')
         # enemy_dead
         expected = (np.array([9]), np.array([8]))
-        found = np.where((self.world.map[:, :, 0] > world.OWN_DEAD) &
-                         (self.world.map[:, :, 0] < world.OWN_ANT))
+        found = np.where(self.world.map[:, :, world.ENEMY_DEAD])
         self.assertTrue((expected == found), msg='ENEMY DEAD')
 
     def test_is_tile_visible(self):
-        self.assertTrue(False)
+        TURN =  'a 10 10 0\n'
+        self._perform_world_setup()
+        data = [line.strip() for line in TURN.split('\n') if line.strip()]
+        self.world._update(data)
+        self.assertTrue(self.world.is_tile_visible((11, 11)))
+        self.assertFalse(self.world.is_tile_visible((1, 11)))
 
-    def test_get_friendfoes(self):
-        self.assertTrue(False)
-
-    def test_diffuse(self):
-        TURN =  ''' f 6 5
-                    w 7 6
-                    a 7 9 1
-                    a 10 8 0
-                    a 10 9 0
-                    h 7 12 1
-                    h 10 5 0
-                    d 8 9 1
-                    d 10 10 0
+    def test_is_tile_passable(self):
+        TURN =  ''''a 10 10 0
+                    h 11 11 0
+                    d 11 12 0
+                    d 11 13 1
+                    a 11 14 1
+                    h 11 15 1
+                    w 11 16
+                    f 11 17
                 '''
         self._perform_world_setup()
         data = [line.strip() for line in TURN.split('\n') if line.strip()]
         self.world._update(data)
-        self.world.diffuse()
-        self.assertTrue(False)
+        self.assertTrue(self.world.is_tile_passable((11, 11)), msg='own hill')
+        self.assertTrue(self.world.is_tile_passable((12, 11)), msg='own dead')
+        self.assertTrue(self.world.is_tile_passable((13, 11)), msg='e. dead')
+        self.assertFalse(self.world.is_tile_passable((14, 11)), msg='e. ant')
+        self.assertTrue(self.world.is_tile_passable((15, 11)), msg='e. hill')
+        self.assertFalse(self.world.is_tile_passable((16, 11)), msg='water')
+        self.assertFalse(self.world.is_tile_passable((17, 11)), msg='food')
 
     def test_issue_order(self):
         KNOWN = [((np.array((24, 12)), 'n'), 'o 12 24 n'),
@@ -185,6 +194,7 @@ class TestAnts(unittest.TestCase):
             self.assertEqual(outcome, self._read_output()[0])
 
     def test_finish_turn(self):
+        self.world.turn_start_time = 0
         self.world.finish_turn()
         self.assertEqual('go', self._read_output()[0])
 
@@ -232,5 +242,31 @@ class TestAnts(unittest.TestCase):
               (expected == self.world.destination(location, direction)).all(),
               msg='%s' % self.world.destination(location, direction))
 
-    def get_scent_direction(self):
+    def test_get_legalmoves(self):
+        TURN =  '''f 9 6 0
+                   a 8 5 1
+                   a 9 5 0
+                   w 9 4
+                '''
+        EXPECTED = [[(5, 9), 0], [(5, 10), 's'], [(5, 8), 'n']]
+        self._perform_world_setup()
+        data = [line.strip() for line in TURN.split('\n') if line.strip()]
+        self.world._update(data)
+        to_set = lambda li : set(tuple(el) for el in li)
+        result = self.world.get_legal_moves((5, 9))
+        self.assertEqual(to_set(EXPECTED), to_set(result))
+
+    def test_get_scent_direction(self):
+        self.assertTrue(False)
+
+    def test_get_engageable(self):
+        self.assertTrue(False)
+
+    def test_get_in_attackradius(self):
+        self.assertTrue(False)
+
+    def test_get_scent_strengths(self):
+        self.assertTrue(False)
+
+    def test_get_stuff_in_sight(self):
         self.assertTrue(False)
