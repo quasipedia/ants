@@ -26,7 +26,7 @@ __email__ = "quasipedia@gmail.com"
 __status__ = "Development"
 
 
-class TestAnts(unittest.TestCase):
+class TestWorld(unittest.TestCase):
 
     '''
     Tests World class (interface layer between game engine and Bot AI).
@@ -61,7 +61,7 @@ class TestAnts(unittest.TestCase):
                       turntime 1000
                       rows 20
                       cols 30
-                      turns 500
+                      turns 10
                       viewradius2 10
                       attackradius2 5
                       spawnradius2 1
@@ -78,7 +78,7 @@ class TestAnts(unittest.TestCase):
         self.assertEqual(self.world.turntime, 1000)
         self.assertEqual(self.world.rows, 20)
         self.assertEqual(self.world.cols, 30)
-        self.assertEqual(self.world.turns, 500)
+        self.assertEqual(self.world.turns, 10)
         self.assertEqual(self.world.viewradius2, 10)
         self.assertEqual(self.world.attackradius2, 5)
         self.assertEqual(self.world.spawnradius2, 1)
@@ -243,7 +243,7 @@ class TestAnts(unittest.TestCase):
               msg='%s' % self.world.destination(location, direction))
 
     def test_get_legalmoves(self):
-        TURN =  '''f 9 6 0
+        TURN =  '''f 9 6
                    a 8 5 1
                    a 9 5 0
                    w 9 4
@@ -256,17 +256,126 @@ class TestAnts(unittest.TestCase):
         result = self.world.get_legal_moves((5, 9))
         self.assertEqual(to_set(EXPECTED), to_set(result))
 
-    def test_get_scent_direction(self):
-        self.assertTrue(False)
-
-    def test_get_engageable(self):
-        self.assertTrue(False)
-
-    def test_get_in_attackradius(self):
-        self.assertTrue(False)
-
     def test_get_scent_strengths(self):
-        self.assertTrue(False)
+        TURN =  '''f 10 7
+                   a 11 9 0
+                '''
+        EXPECTED = [[(8, 11), 'w'], [(9, 10), 'n'],
+                    [(9, 12), 's'], [(10, 11), 'e']]
+        self._perform_world_setup()
+        data = [line.strip() for line in TURN.split('\n') if line.strip()]
+        self.world._update(data)
+        self.world.diffuse()
+        result = self.world.get_scent_strengths((9, 11), world.H_HARVEST)
+        # Since the food emitting force may change in the future, we only want
+        # to test the directions are right, not the abs value of the scent...
+        self.assertEqual(EXPECTED, [el[1:] for el in result])
 
     def test_get_stuff_in_sight(self):
-        self.assertTrue(False)
+        SETUP = '''turn 0
+                   loadtime 3000
+                   turntime 1000
+                   rows 20
+                   cols 30
+                   turns 10
+                   viewradius2 10
+                   attackradius2 5
+                   spawnradius2 1
+                   player_seed 42
+                '''
+        TURN =  '''a 11 9 0
+                   f 10 7
+                   f 19 1
+                   a 13 10 1
+                   a 0 0 1
+                   h 13 8 1
+                   h 19 19 1
+                '''
+        EXPECTED = {world.FOOD: (7, 10),
+                    world.ENEMY_ANTS: (10, 13),
+                    world.ENEMY_HILLS: (8, 13)}
+        self._perform_world_setup(SETUP)
+        data = [line.strip() for line in TURN.split('\n') if line.strip()]
+        self.world._update(data)
+        for layer in EXPECTED:
+            result = self.world.get_stuff_in_sight((9, 11), layer)
+            self.assertTrue(len(result) == 1)
+            self.assertEqual(EXPECTED[layer], tuple(result[0]))
+
+    def test_get_in_attackradius(self):
+        SETUP = '''turn 0
+                   loadtime 3000
+                   turntime 1000
+                   rows 20
+                   cols 30
+                   turns 10
+                   viewradius2 10
+                   attackradius2 5
+                   spawnradius2 1
+                   player_seed 42
+                '''
+        TURN =  '''a 11 9 0
+                   a 11 8 1
+                   a 11 7 1
+                   a 11 6 1
+                   a 11 10 1
+                   a 11 11 1
+                   a 11 12 1
+                   a 10 9 1
+                   a 9 9 1
+                   a 8 9 1
+                   a 12 9 1
+                   a 13 9 1
+                   a 14 9 1
+                '''
+        EXPECTED = set([(8, 11), (7, 11), (10, 11), (11, 11),
+                        (9, 10), (9, 9), (9, 12), (9, 13)])
+        self._perform_world_setup(SETUP)
+        data = [line.strip() for line in TURN.split('\n') if line.strip()]
+        self.world._update(data)
+        result = self.world.get_in_attackradius((9, 11))
+        result = set([tuple(arr) for arr in result])
+        self.assertEqual(EXPECTED, result)
+
+    def test_get_engageable(self):
+        SETUP = '''turn 0
+                   loadtime 3000
+                   turntime 1000
+                   rows 20
+                   cols 30
+                   turns 10
+                   viewradius2 10
+                   attackradius2 5
+                   spawnradius2 1
+                   player_seed 42
+                '''
+        TURN =  '''a 11 9 1
+                   a 11 8 0
+                   a 11 7 0
+                   a 11 6 0
+                   a 11 5 0
+                   a 11 4 0
+                   a 11 10 0
+                   a 11 11 0
+                   a 11 12 0
+                   a 11 13 0
+                   a 11 14 0
+                   a 10 9 0
+                   a 9 9 0
+                   a 8 9 0
+                   a 7 9 0
+                   a 6 9 0
+                   a 12 9 0
+                   a 13 9 0
+                   a 14 9 0
+                   a 15 9 0
+                   a 16 9 0
+                '''
+        EXPECTED = set([(6, 11), (5, 11), (12, 11), (13, 11),
+                        (9, 8), (9, 7), (9, 14), (9, 15)])
+        self._perform_world_setup(SETUP)
+        data = [line.strip() for line in TURN.split('\n') if line.strip()]
+        self.world._update(data)
+        result = self.world.get_engageable((9, 11))
+        result = set([tuple(arr) for arr in result])
+        self.assertEqual(EXPECTED, result)
